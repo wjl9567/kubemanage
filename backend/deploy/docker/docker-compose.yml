@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  # PostgreSQL 数据库
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: kubemanage
+      POSTGRES_USER: kubemanage
+      POSTGRES_PASSWORD: kubemanage123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kubemanage"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis 缓存
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  # KubeManage 平台
+  kubemanage:
+    build:
+      context: ../..
+      dockerfile: backend/deploy/docker/Dockerfile
+    environment:
+      DATABASE_URL: "host=postgres user=kubemanage password=kubemanage123 dbname=kubemanage port=5432 sslmode=disable"
+      REDIS_URL: "redis://redis:6379"
+      GIN_MODE: release
+      PORT: "8080"
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:

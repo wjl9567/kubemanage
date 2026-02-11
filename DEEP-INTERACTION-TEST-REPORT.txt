@@ -1,0 +1,168 @@
+================================================================================
+  KubeManage Platform - 深度交互功能测试报告
+  Deep Interactive Feature Test Report
+================================================================================
+
+测试时间: 2026/2/11 18:12:49
+测试耗时: 43.5 秒
+截图数量: 14
+
+# 测试摘要
+--------------------------------------------------------------------------------
+总测试数: 22
+✅ 通过: 9 (40.9%)
+❌ 失败: 0 (0.0%)
+⚠️  警告: 13 (59.1%)
+
+# 详细测试结果
+--------------------------------------------------------------------------------
+
+1. ✅ 登录页 - 版本号显示
+   找到版本信息
+   📸 01-login-page-initial.png
+
+2. ✅ 登录页 - 表单元素
+   用户名和密码输入框存在
+
+3. ✅ 登录功能
+   成功跳转到: http://localhost:3000/overview
+   📸 02-dashboard-after-login.png
+
+4. ✅ 总览页 - 拓扑图
+   找到拓扑图相关内容
+   📸 02-dashboard-after-login.png
+
+5. ✅ 总览页 - 核心指标
+   显示核心指标卡片
+
+6. ⚠️ 导航 - 多集群管理
+   页面URL不明确
+   📸 03-multi-cluster-page.png
+
+7. ⚠️ 多集群 - 注册集群按钮
+   未找到注册集群按钮
+
+8. ✅ 导航 - 节点管理
+   成功导航到节点页
+   📸 04-node-management-page.png
+
+9. ✅ 节点管理 - 详情抽屉
+   抽屉成功打开
+   📸 05-node-detail-drawer.png
+
+10. ⚠️ 导航 - Deployments
+   页面URL不明确
+   📸 06-deployments-page.png
+
+11. ⚠️ Deployments - 扩缩容按钮
+   未找到扩缩容按钮
+
+12. ⚠️ 导航 - Pods
+   页面URL不明确
+   📸 07-pods-page.png
+
+13. ⚠️ Pods - Pod链接
+   未找到可点击的Pod名称
+
+14. ⚠️ 导航 - ConfigMaps
+   页面URL不明确
+   📸 08-configmaps-page.png
+
+15. ⚠️ ConfigMaps - 创建按钮
+   未找到创建按钮
+
+16. ⚠️ 导航 - CRD管理
+   页面URL不明确
+   📸 09-crd-management-page.png
+
+17. ⚠️ 导航 - 模板管理
+   页面URL不明确
+   📸 10-template-management-page.png
+
+18. ⚠️ 模板管理 - 创建按钮
+   未找到创建按钮
+
+19. ⚠️ 导航 - 监控告警
+   页面URL不明确
+   📸 11-monitoring-page.png
+
+20. ⚠️ 导航 - 日志分析
+   页面URL不明确
+   📸 12-logging-page.png
+
+21. ✅ 日志分析 - 搜索功能
+   成功输入搜索关键词
+   📸 13-logging-search-error.png
+
+22. ✅ 暗黑模式切换
+   成功切换到暗黑模式
+   📸 14-dark-mode-toggled.png
+
+# 发现的UI问题
+--------------------------------------------------------------------------------
+✅ 未发现重大UI问题
+
+# 页面测试状态总结
+--------------------------------------------------------------------------------
+
+✅ 登录页: PASS
+✅ 集群总览: PASS
+⚠️ 多集群管理: WARN
+✅ 节点管理: PASS
+⚠️ Deployments: WARN
+⚠️ Pods: WARN
+⚠️ ConfigMaps: WARN
+⚠️ CRD管理: WARN
+⚠️ 模板管理: WARN
+⚠️ 监控告警: WARN
+⚠️ 日志分析: WARN
+✅ 暗黑模式: PASS
+
+# 截图清单
+--------------------------------------------------------------------------------
+
+1. login-page-initial
+   文件: 01-login-page-initial.png
+
+2. dashboard-after-login
+   文件: 02-dashboard-after-login.png
+
+3. multi-cluster-page
+   文件: 03-multi-cluster-page.png
+
+4. node-management-page
+   文件: 04-node-management-page.png
+
+5. node-detail-drawer
+   文件: 05-node-detail-drawer.png
+
+6. deployments-page
+   文件: 06-deployments-page.png
+
+7. pods-page
+   文件: 07-pods-page.png
+
+8. configmaps-page
+   文件: 08-configmaps-page.png
+
+9. crd-management-page
+   文件: 09-crd-management-page.png
+
+10. template-management-page
+   文件: 10-template-management-page.png
+
+11. monitoring-page
+   文件: 11-monitoring-page.png
+
+12. logging-page
+   文件: 12-logging-page.png
+
+13. logging-search-error
+   文件: 13-logging-search-error.png
+
+14. dark-mode-toggled
+   文件: 14-dark-mode-toggled.png
+
+================================================================================
+  测试报告结束
+================================================================================

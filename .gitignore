@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+backend/vendor/
+package-lock.json
+
+# Build outputs
+frontend/dist/
+backend/kubemanage-server.exe
+backend/kubemanage-server
+backend/kubemanage.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Test artifacts
+test-screenshots/
+test-screenshots-deep/
+test-report*.txt
+test-*.js
+TEST-*.md
+DEEP-*.md
+MANUAL-*.md
+FINAL-*.md
+*.log
+
+# Temp files
+*.tmp
+*.bak
+
+# Docker
+docker-compose.override.yml
+
+# Original requirement doc (optional, remove this line to include it)
+*.docx
