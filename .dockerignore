@@ -1,0 +1,13 @@
+node_modules
+frontend/node_modules
+frontend/dist
+backend/kubemanage-server.exe
+backend/kubemanage-server
+backend/kubemanage.db
+.git
+.gitignore
+*.md
+*.docx
+*.png
+test-*
+mock-server.js
