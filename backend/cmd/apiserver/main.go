@@ -79,7 +79,7 @@ func main() {
 	// 启动服务
 	port := getEnv("PORT", "8080")
 	logger.Info("KubeManage API Server 启动", zap.String("port", port))
-	fmt.Printf("\n🚀 KubeManage API Server running on http://localhost:%s\n\n", port)
+	fmt.Printf("\n🚀 KubeManage API Server running on http://0.0.0.0:%s\n\n", port)
 
 	if err := r.Run(":" + port); err != nil {
 		log.Fatalf("服务启动失败: %v", err)

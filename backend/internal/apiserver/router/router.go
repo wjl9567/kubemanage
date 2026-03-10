@@ -1,6 +1,9 @@
 package router
 
 import (
+	"os"
+	"path/filepath"
+
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -106,4 +109,25 @@ func Setup(r *gin.Engine, db *gorm.DB, k8sMgr *k8sclient.Manager, logger *zap.Lo
 	authed.GET("/ingresses", networkHandler.ListIngresses)
 	authed.GET("/ingresses/:name", networkHandler.GetIngress)
 	authed.DELETE("/ingresses/:name", networkHandler.DeleteIngress)
+
+	// 前端静态资源与 SPA 回退（Docker 镜像内 ./web 为前端构建产物）
+	webRoot := "web"
+	if v := os.Getenv("WEB_ROOT"); v != "" {
+		webRoot = v
+	}
+	indexPath := filepath.Join(webRoot, "index.html")
+	if fi, err := os.Stat(indexPath); err == nil && !fi.IsDir() {
+		assetsDir := filepath.Join(webRoot, "assets")
+		if _, err := os.Stat(assetsDir); err == nil {
+			r.Static("/assets", assetsDir)
+		}
+		favicon := filepath.Join(webRoot, "favicon.ico")
+		if _, err := os.Stat(favicon); err == nil {
+			r.StaticFile("/favicon.ico", favicon)
+		}
+		r.NoRoute(func(c *gin.Context) {
+			c.File(indexPath)
+		})
+		logger.Info("已挂载前端静态资源", zap.String("web_root", webRoot))
+	}
 }
