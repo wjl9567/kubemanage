@@ -3,14 +3,19 @@ package middleware
 import (
 	"bytes"
 	"io"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
+	"gorm.io/gorm"
+
+	"github.com/kubemanage/backend/internal/model"
 )
 
-// AuditLog 审计日志中间件
-func AuditLog(logger *zap.Logger) gin.HandlerFunc {
+// AuditLog 审计日志中间件（logger 必填，db 可选；db 非空时持久化到 audit_log 表）
+func AuditLog(logger *zap.Logger, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		path := c.Request.URL.Path
@@ -26,12 +31,16 @@ func AuditLog(logger *zap.Logger) gin.HandlerFunc {
 		// 处理请求
 		c.Next()
 
-		// 记录审计日志
 		duration := time.Since(start)
 		statusCode := c.Writer.Status()
 
-		username, _ := c.Get("username")
-		userID, _ := c.Get("user_id")
+		usernameVal, _ := c.Get("username")
+		userIDVal, _ := c.Get("user_id")
+		username, _ := usernameVal.(string)
+		userID := uint(0)
+		if uid, ok := userIDVal.(uint); ok {
+			userID = uid
+		}
 
 		logger.Info("API Audit",
 			zap.Any("user_id", userID),
@@ -44,13 +53,40 @@ func AuditLog(logger *zap.Logger) gin.HandlerFunc {
 			zap.Duration("duration", duration),
 			zap.String("query", c.Request.URL.RawQuery),
 		)
+
+		if db != nil {
+			clusterID := uint(0)
+			if idStr := c.GetHeader("X-Cluster-ID"); idStr != "" {
+				if id, _ := strconv.ParseUint(idStr, 10, 32); id > 0 {
+					clusterID = uint(id)
+				}
+			}
+			result := "success"
+			if statusCode >= 400 {
+				result = "failure"
+			}
+			_ = db.Create(&model.AuditLog{
+				UserID:    userID,
+				Username:  username,
+				ClusterID: clusterID,
+				Action:    method,
+				Resource:  path,
+				Result:    result,
+				IP:        c.ClientIP(),
+				UserAgent: c.Request.UserAgent(),
+			}).Error
+		}
 	}
 }
 
-// CORS 跨域中间件
+// CORS 跨域中间件（生产环境建议设置 CORS_ORIGIN 为具体域名，如 https://kubemanage.example.com）
 func CORS() gin.HandlerFunc {
+	origin := os.Getenv("CORS_ORIGIN")
+	if origin == "" {
+		origin = "*"
+	}
 	return func(c *gin.Context) {
-		c.Header("Access-Control-Allow-Origin", "*")
+		c.Header("Access-Control-Allow-Origin", origin)
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Authorization, X-Cluster-ID")
 		c.Header("Access-Control-Expose-Headers", "Content-Length, Content-Type")
@@ -63,3 +99,4 @@ func CORS() gin.HandlerFunc {
 		c.Next()
 	}
 }
+

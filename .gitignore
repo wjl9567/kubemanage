@@ -7,6 +7,7 @@ package-lock.json
 # Build outputs
 frontend/dist/
 backend/kubemanage-server.exe
+backend/apiserver.exe
 backend/kubemanage-server
 backend/kubemanage.db
 

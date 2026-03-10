@@ -23,7 +23,7 @@ import (
 func Setup(r *gin.Engine, db *gorm.DB, k8sMgr *k8sclient.Manager, logger *zap.Logger) {
 	// 中间件
 	r.Use(middleware.CORS())
-	r.Use(middleware.AuditLog(logger))
+	r.Use(middleware.AuditLog(logger, db))
 
 	// 健康检查
 	r.GET("/healthz", func(c *gin.Context) { c.JSON(200, gin.H{"status": "ok"}) })

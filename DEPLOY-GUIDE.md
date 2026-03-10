@@ -50,7 +50,31 @@ sudo ./deploy.sh
 
 部署完成后会显示访问地址和管理账号。
 
-### 方式二：Docker Compose 手动部署
+### 方式二：项目根目录 Docker Compose（推荐用于生产）
+
+在**项目根目录**使用自带的 `Dockerfile` 与 `docker-compose.yml` 构建并启动，前后端一体镜像，端口与数据卷配置完整：
+
+```bash
+# 1. 克隆代码
+git clone https://github.com/wjl9567/kubemanage.git
+cd kubemanage
+
+# 2. 在项目根目录构建并启动
+docker compose build --no-cache
+docker compose up -d
+
+# 3. 查看状态
+docker compose ps
+```
+
+**生产环境**请在 `docker-compose.yml` 或环境中配置：
+- `JWT_SECRET`：JWT 签名密钥（必改）
+- `ENCRYPT_KEY`：AES-256 密钥，**必须为 32 个字符**（用于加密 KubeConfig/Token）
+- `CORS_ORIGIN`：允许的前端来源，如 `https://kubemanage.example.com`（不设则默认为 `*`）
+
+### 方式三：backend/deploy/docker 目录部署（备用）
+
+适用于仅使用后端 Docker 编排、与方式二二选一即可：
 
 ```bash
 # 1. 克隆代码
@@ -66,6 +90,8 @@ docker-compose up -d
 # 4. 查看状态
 docker-compose ps
 ```
+
+> **说明**：方式二在项目根目录，构建上下文包含前后端，产出单一镜像；方式三在 `backend/deploy/docker`，与方式二择一使用即可，避免两套配置混淆。
 
 ---
 

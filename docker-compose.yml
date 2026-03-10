@@ -44,6 +44,10 @@ services:
       REDIS_URL: "redis://redis:6379"
       GIN_MODE: release
       PORT: "8080"
+      # 生产环境请在 .env 或环境中设置，ENCRYPT_KEY 必须为 32 字符
+      JWT_SECRET: ${JWT_SECRET:-}
+      ENCRYPT_KEY: ${ENCRYPT_KEY:-}
+      CORS_ORIGIN: ${CORS_ORIGIN:-}
     ports:
       - "8080:8080"
     depends_on:
