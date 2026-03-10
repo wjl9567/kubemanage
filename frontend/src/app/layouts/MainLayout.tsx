@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
   Layout, Menu, Avatar, Dropdown, Space, Badge, Select, Switch, Typography, Button, Input, Tooltip,
@@ -13,6 +13,7 @@ import {
 } from '@ant-design/icons'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
+import { clusterApi } from '@/services/api'
 
 const { Header, Sider, Content, Footer } = Layout
 const { Text } = Typography
@@ -61,9 +62,18 @@ const menuItems = [
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, logout } = useAuthStore()
+  const { user, logout, currentCluster, setCluster } = useAuthStore()
   const { isDark, collapsed, toggleTheme, toggleCollapsed } = useThemeStore()
   const [searchVisible, setSearchVisible] = useState(false)
+  const [clusterOptions, setClusterOptions] = useState<{ value: number; label: string }[]>([])
+
+  useEffect(() => {
+    clusterApi.list().then((res: any) => {
+      const list = res?.data?.list ?? res?.list ?? []
+      setClusterOptions(list.map((c: any) => ({ value: c.id, label: c.display_name || c.name || `集群 ${c.id}` })))
+      if (list.length > 0 && currentCluster == null) setCluster(list[0].id)
+    }).catch(() => setClusterOptions([]))
+  }, [])
 
   const handleMenuClick = ({ key }: { key: string }) => {
     if (key.startsWith('/')) navigate(key)
@@ -166,7 +176,10 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
               placeholder="选择集群"
               style={{ width: 180 }}
               size="small"
-              options={[{ value: 1, label: '默认集群' }]}
+              value={currentCluster ?? undefined}
+              onChange={(v) => setCluster(v)}
+              options={clusterOptions}
+              loading={clusterOptions.length === 0}
             />
 
             {/* 主题切换 */}

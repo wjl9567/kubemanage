@@ -1,12 +1,14 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Card, Tabs, Form, Input, Button, Switch, Select, Typography, Descriptions, Table, Tag, Space, message } from 'antd'
 import { SettingOutlined, UserOutlined, SafetyOutlined, DatabaseOutlined, BellOutlined } from '@ant-design/icons'
 import { useAuthStore } from '@/stores/auth'
+import { authApi } from '@/services/api'
 
 const { Title, Text } = Typography
 
 export default function Settings() {
   const user = useAuthStore((s) => s.user)
+  const [passwordLoading, setPasswordLoading] = useState(false)
 
   // 审计日志（模拟数据）
   const auditLogs = [
@@ -43,11 +45,27 @@ export default function Settings() {
               </Descriptions>
               <Title level={5} style={{ marginTop: 24 }}>修改密码</Title>
               <Form layout="vertical" style={{ maxWidth: 400 }}
-                onFinish={() => message.success('密码修改成功')}>
-                <Form.Item name="old_password" label="当前密码" rules={[{ required: true }]}><Input.Password /></Form.Item>
-                <Form.Item name="new_password" label="新密码" rules={[{ required: true, min: 6 }]}><Input.Password /></Form.Item>
-                <Form.Item name="confirm" label="确认密码" rules={[{ required: true }]}><Input.Password /></Form.Item>
-                <Button type="primary" htmlType="submit">修改密码</Button>
+                onFinish={async (v: { old_password: string; new_password: string; confirm: string }) => {
+                  if (v.new_password !== v.confirm) {
+                    message.error('两次输入的新密码不一致')
+                    return
+                  }
+                  setPasswordLoading(true)
+                  try {
+                    await authApi.updatePassword({ old_password: v.old_password, new_password: v.new_password })
+                    message.success('密码修改成功，请重新登录')
+                    useAuthStore.getState().logout()
+                    window.location.href = '/login'
+                  } catch (e: any) {
+                    message.error(e?.response?.data?.message || e?.message || '修改失败')
+                  } finally {
+                    setPasswordLoading(false)
+                  }
+                }}>
+                <Form.Item name="old_password" label="当前密码" rules={[{ required: true, message: '请输入当前密码' }]}><Input.Password /></Form.Item>
+                <Form.Item name="new_password" label="新密码" rules={[{ required: true, min: 6, message: '至少 6 位' }]}><Input.Password /></Form.Item>
+                <Form.Item name="confirm" label="确认密码" dependencies={['new_password']} rules={[{ required: true }, ({ getFieldValue }) => ({ validator(_, value) { if (!value || getFieldValue('new_password') === value) return Promise.resolve(); return Promise.reject(new Error('两次输入不一致')) } })]}><Input.Password /></Form.Item>
+                <Button type="primary" htmlType="submit" loading={passwordLoading}>修改密码</Button>
               </Form>
             </Card>
           ),

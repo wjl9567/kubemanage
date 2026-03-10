@@ -116,13 +116,15 @@ export default function PodTerminal({ podName, namespace, containers, clusterId 
   }
 
   useEffect(() => {
+    wsRef.current?.close()
+    xtermRef.current?.dispose()
     const cleanup = connect()
     return () => {
       cleanup?.()
       wsRef.current?.close()
       xtermRef.current?.dispose()
     }
-  }, [container])
+  }, [podName, namespace, container, clusterId, token])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 450 }}>

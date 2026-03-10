@@ -21,6 +21,7 @@ export default function Pods() {
   const deleteMut = useMutation({
     mutationFn: ({ name, ns }: any) => workloadApi.deletePod(name, ns),
     onSuccess: () => { message.success('Pod已删除'); refetch() },
+    onError: (e: any) => message.error(e?.response?.data?.message || e?.message || '删除失败'),
   })
 
   const statusColor = (s: string) => {
@@ -74,7 +75,7 @@ export default function Pods() {
           <Button icon={<ReloadOutlined />} onClick={() => refetch()}>刷新</Button>
         </Space>
       </div>
-      <Card><Table columns={columns} dataSource={pods} loading={isLoading} rowKey="name" pagination={{ pageSize: 20, showTotal: (t) => `共 ${t} 个Pod` }} size="small" /></Card>
+      <Card><Table columns={columns} dataSource={pods} loading={isLoading} rowKey={(r) => `${r.namespace}-${r.name}`} pagination={{ pageSize: 20, showTotal: (t) => `共 ${t} 个Pod` }} size="small" /></Card>
 
       <Drawer title={`Pod详情 - ${selected?.name || ''}`} open={drawerOpen} onClose={() => setDrawerOpen(false)} width={700}>
         {selected && (
