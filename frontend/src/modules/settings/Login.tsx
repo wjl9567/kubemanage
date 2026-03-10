@@ -74,7 +74,7 @@ export default function Login() {
         textAlign: 'center', color: 'rgba(255,255,255,0.5)', fontSize: 13,
         letterSpacing: 1, userSelect: 'none',
       }}>
-        KubeManage-v1.0
+        KubeManage-v1.1
       </div>
     </div>
   )

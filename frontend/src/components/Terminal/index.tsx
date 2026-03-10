@@ -22,9 +22,23 @@ export default function PodTerminal({ podName, namespace, containers, clusterId 
   const fitAddonRef = useRef<FitAddon | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
   const [connected, setConnected] = useState(false)
-  const [container, setContainer] = useState(containers[0]?.name || '')
+  const firstContainer = containers[0]?.name || ''
+  const [container, setContainer] = useState(firstContainer)
+  const validNames = containers.map(c => c.name)
+  // Pod 或容器列表变化时，若当前选中的容器不在该 Pod 的容器列表中，则重置为第一个有效容器
+  useEffect(() => {
+    if (validNames.length && !validNames.includes(container)) {
+      setContainer(firstContainer)
+    }
+  }, [podName, namespace, container, firstContainer, validNames.join(',')])
 
   const connect = () => {
+    // 仅当有有效容器时才连接
+    const containerToUse = validNames.length && validNames.includes(container) ? container : firstContainer
+    if (!containerToUse) {
+      return
+    }
+
     // 清理旧连接
     if (wsRef.current) wsRef.current.close()
     if (xtermRef.current) xtermRef.current.dispose()
@@ -65,14 +79,14 @@ export default function PodTerminal({ podName, namespace, containers, clusterId 
     xtermRef.current = term
     fitAddonRef.current = fitAddon
 
-    // WebSocket 连接
+    // WebSocket 连接（使用校验后的容器名）
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const host = window.location.host
-    let url = `${protocol}//${host}/api/v1/pods/${podName}/exec?namespace=${namespace}&container=${container}&cluster_id=${clusterId || 1}`
+    let url = `${protocol}//${host}/api/v1/pods/${podName}/exec?namespace=${namespace}&container=${containerToUse}&cluster_id=${clusterId || 1}`
     if (token) url += `&token=${encodeURIComponent(token)}`
 
     term.writeln('\x1b[1;34m[KubeManage Terminal]\x1b[0m 正在连接...')
-    term.writeln(`\x1b[90mPod: ${podName} | Container: ${container} | Namespace: ${namespace}\x1b[0m`)
+    term.writeln(`\x1b[90mPod: ${podName} | Container: ${containerToUse} | Namespace: ${namespace}\x1b[0m`)
     term.writeln('')
 
     const ws = new WebSocket(url)
@@ -90,6 +104,7 @@ export default function PodTerminal({ podName, namespace, containers, clusterId 
     ws.onclose = () => {
       setConnected(false)
       term.writeln('\r\n\x1b[1;31m[连接已断开]\x1b[0m')
+      term.writeln('\x1b[90m若因容器名无效导致断开，请在上方下拉选择正确容器后点击「重连」\x1b[0m\r\n')
     }
 
     ws.onerror = () => {

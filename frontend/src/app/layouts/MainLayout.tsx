@@ -233,7 +233,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             <span style={{ color: '#52c41a' }}>●</span>
             <span>平台运行正常</span>
           </Space>
-          <span>KubeManage v1.0.0 | Kubernetes 管理平台</span>
+          <span>KubeManage v1.1.0 | Kubernetes 管理平台</span>
           <span>数据更新: {new Date().toLocaleTimeString()}</span>
         </Footer>
       </Layout>

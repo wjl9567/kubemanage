@@ -119,6 +119,7 @@ export default function Pods() {
                   podName={selected.name}
                   namespace={selected.namespace}
                   containers={selected.containers || []}
+                  clusterId={currentCluster ?? undefined}
                 />
               ),
             },
