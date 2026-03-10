@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react'
-import { Card, Tabs, Form, Input, Button, Switch, Select, Typography, Descriptions, Table, Tag, Space, message } from 'antd'
-import { SettingOutlined, UserOutlined, SafetyOutlined, DatabaseOutlined, BellOutlined } from '@ant-design/icons'
+import { Card, Tabs, Form, Input, Button, Switch, Select, Typography, Descriptions, Table, Tag, Space, message, Modal, Checkbox } from 'antd'
+import { SettingOutlined, UserOutlined, SafetyOutlined, DatabaseOutlined, BellOutlined, TeamOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/stores/auth'
-import { authApi, auditApi, systemApi, alertChannelApi, backupApi } from '@/services/api'
+import { authApi, auditApi, systemApi, alertChannelApi, backupApi, clusterApi, namespaceApi } from '@/services/api'
 
 const { Title, Text } = Typography
 
@@ -12,6 +12,10 @@ export default function Settings() {
   const [passwordLoading, setPasswordLoading] = useState(false)
   const [configForm] = Form.useForm()
   const queryClient = useQueryClient()
+  const [authModalUser, setAuthModalUser] = useState<{ id: number; username: string } | null>(null)
+  const [authClusterIds, setAuthClusterIds] = useState<number[]>([])
+  const [authNsClusterId, setAuthNsClusterId] = useState<number | null>(null)
+  const [authNsList, setAuthNsList] = useState<string[]>([])
 
   const { data: auditData, isLoading: auditLoading } = useQuery({
     queryKey: ['audit-logs'],
@@ -47,6 +51,72 @@ export default function Settings() {
     onSuccess: () => { message.success('配置已保存'); queryClient.invalidateQueries({ queryKey: ['system-config'] }) },
     onError: (e: any) => message.error(e?.message || '保存失败'),
   })
+
+  const { data: usersData } = useQuery({
+    queryKey: ['users'],
+    queryFn: () => authApi.listUsers(),
+    enabled: user?.role === 'admin',
+  })
+  const usersList = (usersData as any)?.data?.list ?? (usersData as any)?.list ?? []
+  const { data: clustersData } = useQuery({
+    queryKey: ['clusters'],
+    queryFn: () => clusterApi.list(),
+    enabled: !!authModalUser,
+  })
+  const clustersList = (clustersData as any)?.data?.list ?? (clustersData as any)?.list ?? []
+  const { data: userClustersData } = useQuery({
+    queryKey: ['user-clusters', authModalUser?.id],
+    queryFn: () => authApi.listUserClusters(authModalUser!.id),
+    enabled: !!authModalUser?.id,
+  })
+  const userClusterIds: number[] = (userClustersData as any)?.data?.cluster_ids ?? (userClustersData as any)?.cluster_ids ?? []
+  const { data: nsByClusterData } = useQuery({
+    queryKey: ['namespaces-by-cluster', authNsClusterId],
+    queryFn: () => namespaceApi.listByCluster(authNsClusterId!),
+    enabled: !!authNsClusterId,
+  })
+  const nsOptionsByCluster = ((nsByClusterData as any)?.data?.list ?? (nsByClusterData as any)?.list ?? []).map((n: any) => ({ label: n.name, value: n.name }))
+  const { data: userNsData } = useQuery({
+    queryKey: ['user-namespaces', authModalUser?.id, authNsClusterId],
+    queryFn: () => authApi.listUserNamespaces(authModalUser!.id, authNsClusterId!),
+    enabled: !!authModalUser?.id && !!authNsClusterId,
+  })
+  const userNsList: string[] = (userNsData as any)?.data?.namespaces ?? (userNsData as any)?.namespaces ?? []
+
+  useEffect(() => {
+    if (authModalUser) setAuthClusterIds(userClusterIds)
+  }, [authModalUser, userClusterIds])
+  useEffect(() => {
+    if (authNsClusterId != null) setAuthNsList(userNsList)
+  }, [authNsClusterId, userNsList])
+  useEffect(() => {
+    if (!authModalUser) { setAuthNsClusterId(null); setAuthNsList([]) }
+  }, [authModalUser])
+
+  const setUserClustersMut = useMutation({
+    mutationFn: ({ userId, ids }: { userId: number; ids: number[] }) => authApi.setUserClusters(userId, ids),
+    onSuccess: () => { message.success('集群授权已保存'); queryClient.invalidateQueries({ queryKey: ['user-clusters', authModalUser?.id] }) },
+    onError: (e: any) => message.error(e?.message || '保存失败'),
+  })
+  const setUserNamespacesMut = useMutation({
+    mutationFn: ({ userId, clusterId, ns }: { userId: number; clusterId: number; ns: string[] }) => authApi.setUserNamespaces(userId, clusterId, ns),
+    onSuccess: () => { message.success('命名空间授权已保存'); queryClient.invalidateQueries({ queryKey: ['user-namespaces', authModalUser?.id, authNsClusterId] }) },
+    onError: (e: any) => message.error(e?.message || '保存失败'),
+  })
+
+  const openAuthModal = (u: any) => {
+    setAuthModalUser({ id: u.id, username: u.username })
+    setAuthNsClusterId(null)
+    setAuthNsList([])
+  }
+  const saveUserClusters = () => {
+    if (!authModalUser) return
+    setUserClustersMut.mutate({ userId: authModalUser.id, ids: authClusterIds })
+  }
+  const saveUserNamespaces = () => {
+    if (!authModalUser || authNsClusterId == null) return
+    setUserNamespacesMut.mutate({ userId: authModalUser.id, clusterId: authNsClusterId, ns: authNsList })
+  }
 
   return (
     <div>
@@ -90,6 +160,42 @@ export default function Settings() {
             </Card>
           ),
         },
+        ...(user?.role === 'admin' ? [{
+          key: 'users', label: <Space><TeamOutlined />用户管理</Space>,
+          children: (
+            <Card>
+              <Table size="small" dataSource={usersList.map((u: any) => ({ ...u, key: u.id }))} columns={[
+                { title: 'ID', dataIndex: 'id', key: 'id', width: 70 },
+                { title: '用户名', dataIndex: 'username', key: 'username' },
+                { title: '昵称', dataIndex: 'nickname', key: 'nickname' },
+                { title: '角色', dataIndex: 'role', key: 'role', render: (v: string) => <Tag color="blue">{v}</Tag> },
+                { title: '操作', key: 'action', render: (_: any, r: any) => <Button size="small" onClick={() => openAuthModal(r)}>授权</Button> },
+              ]} pagination={{ pageSize: 15 }} />
+              <Modal title={`授权 - ${authModalUser?.username || ''}`} open={!!authModalUser} onCancel={() => setAuthModalUser(null)} width={560} footer={null} destroyOnClose>
+                {authModalUser && (
+                  <Space direction="vertical" style={{ width: '100%' }} size="middle">
+                    <div>
+                      <Text strong>可访问集群</Text>
+                      <div style={{ marginTop: 8 }}>
+                        <Checkbox.Group value={authClusterIds} onChange={v => setAuthClusterIds(v as number[])} options={clustersList.map((c: any) => ({ label: c.display_name || c.name || `集群 ${c.id}`, value: c.id }))} />
+                      </div>
+                      <Button type="primary" size="small" style={{ marginTop: 8 }} onClick={saveUserClusters} loading={setUserClustersMut.isPending}>保存集群授权</Button>
+                    </div>
+                    <div>
+                      <Text strong>按集群配置可访问命名空间</Text>
+                      <Space style={{ marginTop: 8 }}>
+                        <Select placeholder="选择集群" value={authNsClusterId ?? undefined} onChange={v => { setAuthNsClusterId(v); setAuthNsList([]) }} style={{ width: 200 }} options={clustersList.map((c: any) => ({ label: c.display_name || c.name || `集群 ${c.id}`, value: c.id }))} />
+                        <Select mode="multiple" placeholder="选择命名空间" value={authNsList} onChange={setAuthNsList} style={{ minWidth: 220 }} options={nsOptionsByCluster} />
+                        <Button type="primary" size="small" onClick={saveUserNamespaces} loading={setUserNamespacesMut.isPending} disabled={authNsClusterId == null}>保存该集群命名空间</Button>
+                      </Space>
+                      <div style={{ marginTop: 4 }}><Text type="secondary">不配置命名空间则默认可访问该集群下全部命名空间</Text></div>
+                    </div>
+                  </Space>
+                )}
+              </Modal>
+            </Card>
+          ),
+        }] : []),
         {
           key: 'global', label: <Space><SettingOutlined />全局配置</Space>,
           children: (

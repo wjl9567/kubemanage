@@ -12,6 +12,17 @@ import (
 	"gorm.io/gorm"
 )
 
+func getUserID(c *gin.Context) uint {
+	v, _ := c.Get("user_id")
+	if u, ok := v.(uint); ok {
+		return u
+	}
+	if f, ok := v.(float64); ok {
+		return uint(f)
+	}
+	return 0
+}
+
 type Handler struct {
 	db        *gorm.DB
 	k8sMgr    *k8sclient.Manager
@@ -21,12 +32,25 @@ func NewHandler(db *gorm.DB, k8sMgr *k8sclient.Manager) *Handler {
 	return &Handler{db: db, k8sMgr: k8sMgr}
 }
 
-// List 集群列表
+// List 集群列表（非 admin 用户仅返回已授权集群）
 func (h *Handler) List(c *gin.Context) {
+	roleVal, _ := c.Get("role")
+	role, _ := roleVal.(string)
+	userID := getUserID(c)
+
 	var clusters []model.Cluster
 	var total int64
 	query := h.db.Model(&model.Cluster{})
 
+	if role != "admin" && userID > 0 {
+		var allowedIDs []uint
+		h.db.Model(&model.UserCluster{}).Where("user_id = ?", userID).Pluck("cluster_id", &allowedIDs)
+		if len(allowedIDs) == 0 {
+			response.Success(c, gin.H{"list": []model.Cluster{}, "total": 0})
+			return
+		}
+		query = query.Where("id IN ?", allowedIDs)
+	}
 	if t := c.Query("type"); t != "" {
 		query = query.Where("type = ?", t)
 	}

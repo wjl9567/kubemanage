@@ -66,6 +66,8 @@ func main() {
 		&model.ResourceTemplate{},
 		&model.SystemConfig{},
 		&model.Backup{},
+		&model.UserCluster{},
+		&model.UserNamespace{},
 	)
 
 	// 创建默认管理员

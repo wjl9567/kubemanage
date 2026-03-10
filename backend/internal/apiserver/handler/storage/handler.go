@@ -52,6 +52,38 @@ func (h *Handler) GetStorageClass(c *gin.Context) {
 	response.Success(c, sc)
 }
 
+// ListPVs PV 列表
+func (h *Handler) ListPVs(c *gin.Context) {
+	svc, err := h.getSvc(c)
+	if err != nil { response.Error(c, response.ErrCodeClusterConnFail, err.Error()); return }
+	list, err := svc.ListPVs(c.Request.Context())
+	if err != nil { response.Error(c, response.ErrCodeK8sApiFail, err.Error()); return }
+	items := make([]gin.H, 0, len(list.Items))
+	for _, pv := range list.Items {
+		capacity := ""
+		if pv.Spec.Capacity != nil {
+			if storage, ok := pv.Spec.Capacity["storage"]; ok {
+				capacity = storage.String()
+			}
+		}
+		items = append(items, gin.H{
+			"name": pv.Name, "status": string(pv.Status.Phase),
+			"capacity": capacity, "access_modes": pv.Spec.AccessModes,
+			"storage_class": pv.Spec.StorageClassName, "claim_ref": pv.Spec.ClaimRef,
+			"created_at": pv.CreationTimestamp,
+		})
+	}
+	response.Success(c, gin.H{"list": items, "total": len(items)})
+}
+
+func (h *Handler) GetPV(c *gin.Context) {
+	svc, err := h.getSvc(c)
+	if err != nil { response.Error(c, response.ErrCodeClusterConnFail, err.Error()); return }
+	pv, err := svc.GetPV(c.Request.Context(), c.Param("name"))
+	if err != nil { response.Error(c, response.ErrCodeResourceNotFound, err.Error()); return }
+	response.Success(c, pv)
+}
+
 // ListPVCs PVC列表
 func (h *Handler) ListPVCs(c *gin.Context) {
 	svc, err := h.getSvc(c)

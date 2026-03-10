@@ -5,8 +5,11 @@ import (
 	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -30,6 +33,10 @@ func (s *ResourceService) ListNodes(ctx context.Context) (*corev1.NodeList, erro
 
 func (s *ResourceService) GetNode(ctx context.Context, name string) (*corev1.Node, error) {
 	return s.clientset.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
+}
+
+func (s *ResourceService) UpdateNode(ctx context.Context, node *corev1.Node) (*corev1.Node, error) {
+	return s.clientset.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{})
 }
 
 // ==================== Namespace 操作 ====================
@@ -154,6 +161,14 @@ func (s *ResourceService) GetService(ctx context.Context, namespace, name string
 	return s.clientset.CoreV1().Services(namespace).Get(ctx, name, metav1.GetOptions{})
 }
 
+func (s *ResourceService) CreateService(ctx context.Context, namespace string, svc *corev1.Service) (*corev1.Service, error) {
+	return s.clientset.CoreV1().Services(namespace).Create(ctx, svc, metav1.CreateOptions{})
+}
+
+func (s *ResourceService) UpdateService(ctx context.Context, namespace string, svc *corev1.Service) (*corev1.Service, error) {
+	return s.clientset.CoreV1().Services(namespace).Update(ctx, svc, metav1.UpdateOptions{})
+}
+
 func (s *ResourceService) DeleteService(ctx context.Context, namespace, name string) error {
 	return s.clientset.CoreV1().Services(namespace).Delete(ctx, name, metav1.DeleteOptions{})
 }
@@ -169,6 +184,14 @@ func (s *ResourceService) ListIngresses(ctx context.Context, namespace string) (
 
 func (s *ResourceService) GetIngress(ctx context.Context, namespace, name string) (*networkingv1.Ingress, error) {
 	return s.clientset.NetworkingV1().Ingresses(namespace).Get(ctx, name, metav1.GetOptions{})
+}
+
+func (s *ResourceService) CreateIngress(ctx context.Context, namespace string, ing *networkingv1.Ingress) (*networkingv1.Ingress, error) {
+	return s.clientset.NetworkingV1().Ingresses(namespace).Create(ctx, ing, metav1.CreateOptions{})
+}
+
+func (s *ResourceService) UpdateIngress(ctx context.Context, namespace string, ing *networkingv1.Ingress) (*networkingv1.Ingress, error) {
+	return s.clientset.NetworkingV1().Ingresses(namespace).Update(ctx, ing, metav1.UpdateOptions{})
 }
 
 func (s *ResourceService) DeleteIngress(ctx context.Context, namespace, name string) error {
@@ -231,6 +254,117 @@ func (s *ResourceService) GetPVC(ctx context.Context, namespace, name string) (*
 
 func (s *ResourceService) DeletePVC(ctx context.Context, namespace, name string) error {
 	return s.clientset.CoreV1().PersistentVolumeClaims(namespace).Delete(ctx, name, metav1.DeleteOptions{})
+}
+
+// ==================== Job 操作 ====================
+
+func (s *ResourceService) ListJobs(ctx context.Context, namespace string) (*batchv1.JobList, error) {
+	if namespace == "" {
+		return s.clientset.BatchV1().Jobs("").List(ctx, metav1.ListOptions{})
+	}
+	return s.clientset.BatchV1().Jobs(namespace).List(ctx, metav1.ListOptions{})
+}
+
+func (s *ResourceService) GetJob(ctx context.Context, namespace, name string) (*batchv1.Job, error) {
+	return s.clientset.BatchV1().Jobs(namespace).Get(ctx, name, metav1.GetOptions{})
+}
+
+func (s *ResourceService) CreateJob(ctx context.Context, namespace string, job *batchv1.Job) (*batchv1.Job, error) {
+	return s.clientset.BatchV1().Jobs(namespace).Create(ctx, job, metav1.CreateOptions{})
+}
+
+func (s *ResourceService) DeleteJob(ctx context.Context, namespace, name string) error {
+	return s.clientset.BatchV1().Jobs(namespace).Delete(ctx, name, metav1.DeleteOptions{})
+}
+
+// ==================== CronJob 操作 ====================
+
+func (s *ResourceService) ListCronJobs(ctx context.Context, namespace string) (*batchv1.CronJobList, error) {
+	if namespace == "" {
+		return s.clientset.BatchV1().CronJobs("").List(ctx, metav1.ListOptions{})
+	}
+	return s.clientset.BatchV1().CronJobs(namespace).List(ctx, metav1.ListOptions{})
+}
+
+func (s *ResourceService) GetCronJob(ctx context.Context, namespace, name string) (*batchv1.CronJob, error) {
+	return s.clientset.BatchV1().CronJobs(namespace).Get(ctx, name, metav1.GetOptions{})
+}
+
+func (s *ResourceService) CreateCronJob(ctx context.Context, namespace string, cj *batchv1.CronJob) (*batchv1.CronJob, error) {
+	return s.clientset.BatchV1().CronJobs(namespace).Create(ctx, cj, metav1.CreateOptions{})
+}
+
+func (s *ResourceService) DeleteCronJob(ctx context.Context, namespace, name string) error {
+	return s.clientset.BatchV1().CronJobs(namespace).Delete(ctx, name, metav1.DeleteOptions{})
+}
+
+// ==================== HPA 操作 ====================
+
+func (s *ResourceService) ListHPAs(ctx context.Context, namespace string) (*autoscalingv2.HorizontalPodAutoscalerList, error) {
+	if namespace == "" {
+		return s.clientset.AutoscalingV2().HorizontalPodAutoscalers("").List(ctx, metav1.ListOptions{})
+	}
+	return s.clientset.AutoscalingV2().HorizontalPodAutoscalers(namespace).List(ctx, metav1.ListOptions{})
+}
+
+func (s *ResourceService) GetHPA(ctx context.Context, namespace, name string) (*autoscalingv2.HorizontalPodAutoscaler, error) {
+	return s.clientset.AutoscalingV2().HorizontalPodAutoscalers(namespace).Get(ctx, name, metav1.GetOptions{})
+}
+
+func (s *ResourceService) CreateHPA(ctx context.Context, namespace string, hpa *autoscalingv2.HorizontalPodAutoscaler) (*autoscalingv2.HorizontalPodAutoscaler, error) {
+	return s.clientset.AutoscalingV2().HorizontalPodAutoscalers(namespace).Create(ctx, hpa, metav1.CreateOptions{})
+}
+
+func (s *ResourceService) UpdateHPA(ctx context.Context, namespace string, hpa *autoscalingv2.HorizontalPodAutoscaler) (*autoscalingv2.HorizontalPodAutoscaler, error) {
+	return s.clientset.AutoscalingV2().HorizontalPodAutoscalers(namespace).Update(ctx, hpa, metav1.UpdateOptions{})
+}
+
+func (s *ResourceService) DeleteHPA(ctx context.Context, namespace, name string) error {
+	return s.clientset.AutoscalingV2().HorizontalPodAutoscalers(namespace).Delete(ctx, name, metav1.DeleteOptions{})
+}
+
+// ==================== PV 操作 ====================
+
+func (s *ResourceService) ListPVs(ctx context.Context) (*corev1.PersistentVolumeList, error) {
+	return s.clientset.CoreV1().PersistentVolumes().List(ctx, metav1.ListOptions{})
+}
+
+func (s *ResourceService) GetPV(ctx context.Context, name string) (*corev1.PersistentVolume, error) {
+	return s.clientset.CoreV1().PersistentVolumes().Get(ctx, name, metav1.GetOptions{})
+}
+
+// ==================== RBAC 操作 ====================
+
+func (s *ResourceService) ListRoles(ctx context.Context, namespace string) (*rbacv1.RoleList, error) {
+	return s.clientset.RbacV1().Roles(namespace).List(ctx, metav1.ListOptions{})
+}
+
+func (s *ResourceService) GetRole(ctx context.Context, namespace, name string) (*rbacv1.Role, error) {
+	return s.clientset.RbacV1().Roles(namespace).Get(ctx, name, metav1.GetOptions{})
+}
+
+func (s *ResourceService) ListClusterRoles(ctx context.Context) (*rbacv1.ClusterRoleList, error) {
+	return s.clientset.RbacV1().ClusterRoles().List(ctx, metav1.ListOptions{})
+}
+
+func (s *ResourceService) GetClusterRole(ctx context.Context, name string) (*rbacv1.ClusterRole, error) {
+	return s.clientset.RbacV1().ClusterRoles().Get(ctx, name, metav1.GetOptions{})
+}
+
+func (s *ResourceService) ListRoleBindings(ctx context.Context, namespace string) (*rbacv1.RoleBindingList, error) {
+	return s.clientset.RbacV1().RoleBindings(namespace).List(ctx, metav1.ListOptions{})
+}
+
+func (s *ResourceService) GetRoleBinding(ctx context.Context, namespace, name string) (*rbacv1.RoleBinding, error) {
+	return s.clientset.RbacV1().RoleBindings(namespace).Get(ctx, name, metav1.GetOptions{})
+}
+
+func (s *ResourceService) ListClusterRoleBindings(ctx context.Context) (*rbacv1.ClusterRoleBindingList, error) {
+	return s.clientset.RbacV1().ClusterRoleBindings().List(ctx, metav1.ListOptions{})
+}
+
+func (s *ResourceService) GetClusterRoleBinding(ctx context.Context, name string) (*rbacv1.ClusterRoleBinding, error) {
+	return s.clientset.RbacV1().ClusterRoleBindings().Get(ctx, name, metav1.GetOptions{})
 }
 
 // ==================== StorageClass 操作 ====================

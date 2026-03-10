@@ -1,9 +1,10 @@
 import React, { useState } from 'react'
 import { Card, Table, Tag, Button, Space, Typography, Select, InputNumber, Modal, Popconfirm, message } from 'antd'
-import { AppstoreOutlined, ReloadOutlined, ScissorOutlined, RedoOutlined, DeleteOutlined } from '@ant-design/icons'
+import { AppstoreOutlined, ReloadOutlined, ScissorOutlined, RedoOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { workloadApi, namespaceApi } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
+import EditResourceModal from '@/components/EditResourceModal'
 
 const { Title } = Typography
 
@@ -11,6 +12,7 @@ export default function Deployments() {
   const currentCluster = useAuthStore((s) => s.currentCluster)
   const [namespace, setNamespace] = useState<string>('')
   const [scaleModal, setScaleModal] = useState<{ name: string; ns: string; replicas: number } | null>(null)
+  const [editTarget, setEditTarget] = useState<{ name: string; namespace: string } | null>(null)
   const queryClient = useQueryClient()
 
   const { data: nsData } = useQuery({
@@ -62,9 +64,10 @@ export default function Deployments() {
     },
     { title: '策略', dataIndex: 'strategy', key: 'strategy', render: (v: string) => <Tag color="blue">{v}</Tag> },
     {
-      title: '操作', key: 'action', width: 260,
+      title: '操作', key: 'action', width: 320,
       render: (_: any, r: any) => (
-        <Space>
+        <Space wrap>
+          <Button size="small" icon={<EditOutlined />} onClick={() => setEditTarget({ name: r.name, namespace: r.namespace || 'default' })}>编辑</Button>
           <Button size="small" icon={<ScissorOutlined />} onClick={() => setScaleModal({ name: r.name, ns: r.namespace, replicas: r.replicas })}>扩缩容</Button>
           <Popconfirm title="确认重启？" onConfirm={() => restartMut.mutate({ name: r.name, ns: r.namespace })}>
             <Button size="small" icon={<RedoOutlined />}>重启</Button>
@@ -100,6 +103,17 @@ export default function Deployments() {
             onChange={(v) => scaleModal && setScaleModal({ ...scaleModal, replicas: v || 0 })} />
         </Space>
       </Modal>
+
+      <EditResourceModal
+        open={!!editTarget}
+        onClose={() => setEditTarget(null)}
+        onSuccess={() => { refetch(); setEditTarget(null) }}
+        kind="Deployment"
+        apiVersion="apps/v1"
+        namespace={editTarget?.namespace}
+        name={editTarget?.name || ''}
+        title={`编辑 Deployment: ${editTarget?.name}`}
+      />
     </div>
   )
 }

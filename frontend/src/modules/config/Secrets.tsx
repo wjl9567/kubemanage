@@ -1,14 +1,16 @@
 import React, { useState } from 'react'
 import { Card, Table, Tag, Button, Space, Typography, Select, Popconfirm, message, Drawer, Descriptions } from 'antd'
-import { KeyOutlined, ReloadOutlined, DeleteOutlined, EyeOutlined, LockOutlined } from '@ant-design/icons'
+import { KeyOutlined, ReloadOutlined, DeleteOutlined, EyeOutlined, LockOutlined, EditOutlined } from '@ant-design/icons'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { configApi } from '@/services/api'
+import EditResourceModal from '@/components/EditResourceModal'
 
 const { Title, Text } = Typography
 
 export default function Secrets() {
   const [namespace, setNamespace] = useState('default')
   const [selected, setSelected] = useState<any>(null)
+  const [editTarget, setEditTarget] = useState<{ name: string; namespace: string } | null>(null)
 
   const { data, isLoading, refetch } = useQuery({ queryKey: ['secrets', namespace], queryFn: () => configApi.listSecrets({ namespace }) })
   const { data: detailData } = useQuery({ queryKey: ['secret-detail', selected?.name, selected?.namespace], queryFn: () => configApi.getSecret(selected?.name, selected?.namespace), enabled: !!selected })
@@ -19,14 +21,18 @@ export default function Secrets() {
     { title: '命名空间', dataIndex: 'namespace', key: 'namespace', render: (v: string) => <Tag>{v}</Tag> },
     { title: '类型', dataIndex: 'type', key: 'type', render: (v: string) => <Tag color="purple">{v}</Tag> },
     { title: '数据条目', dataIndex: 'data_count', key: 'data_count' },
-    { title: '操作', key: 'action', render: (_: any, r: any) => (
-      <Space>
-        <Button size="small" icon={<EyeOutlined />} onClick={() => setSelected(r)}>查看</Button>
-        <Popconfirm title="确认删除？" onConfirm={() => deleteMut.mutate({ name: r.name, ns: r.namespace })}>
-          <Button size="small" danger icon={<DeleteOutlined />}>删除</Button>
-        </Popconfirm>
-      </Space>
-    )},
+    {
+      title: '操作', key: 'action',
+      render: (_: any, r: any) => (
+        <Space>
+          <Button size="small" icon={<EyeOutlined />} onClick={() => setSelected(r)}>查看</Button>
+          <Button size="small" icon={<EditOutlined />} onClick={() => setEditTarget({ name: r.name, namespace: r.namespace || 'default' })}>编辑</Button>
+          <Popconfirm title="确认删除？" onConfirm={() => deleteMut.mutate({ name: r.name, ns: r.namespace })}>
+            <Button size="small" danger icon={<DeleteOutlined />}>删除</Button>
+          </Popconfirm>
+        </Space>
+      ),
+    },
   ]
 
   const detail = (detailData as any)?.data
@@ -41,6 +47,9 @@ export default function Secrets() {
         </Space>
       </div>
       <Card><Table columns={columns} dataSource={(data as any)?.data?.list || []} loading={isLoading} rowKey="name" /></Card>
+
+      <EditResourceModal open={!!editTarget} onClose={() => setEditTarget(null)} onSuccess={() => { refetch(); setEditTarget(null) }}
+        kind="Secret" apiVersion="v1" namespace={editTarget?.namespace} name={editTarget?.name || ''} title={`编辑 Secret: ${editTarget?.name}`} />
 
       <Drawer title={`Secret - ${selected?.name}`} open={!!selected} onClose={() => setSelected(null)} width={500}>
         {detail && (

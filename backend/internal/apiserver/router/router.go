@@ -10,14 +10,17 @@ import (
 
 	k8sclient "github.com/kubemanage/backend/internal/k8s/client"
 	"github.com/kubemanage/backend/internal/apiserver/handler/alert"
+	"github.com/kubemanage/backend/internal/apiserver/handler/apply"
 	"github.com/kubemanage/backend/internal/apiserver/handler/audit"
 	"github.com/kubemanage/backend/internal/apiserver/handler/auth"
 	"github.com/kubemanage/backend/internal/apiserver/handler/backup"
 	"github.com/kubemanage/backend/internal/apiserver/handler/cluster"
 	"github.com/kubemanage/backend/internal/apiserver/handler/config"
 	"github.com/kubemanage/backend/internal/apiserver/handler/crd"
+	"github.com/kubemanage/backend/internal/apiserver/handler/hpa"
 	"github.com/kubemanage/backend/internal/apiserver/handler/network"
 	"github.com/kubemanage/backend/internal/apiserver/handler/node"
+	"github.com/kubemanage/backend/internal/apiserver/handler/rbac"
 	"github.com/kubemanage/backend/internal/apiserver/handler/storage"
 	"github.com/kubemanage/backend/internal/apiserver/handler/system"
 	"github.com/kubemanage/backend/internal/apiserver/handler/monitor"
@@ -51,6 +54,10 @@ func Setup(r *gin.Engine, db *gorm.DB, k8sMgr *k8sclient.Manager, logger *zap.Lo
 	authed.PUT("/auth/password", authHandler.UpdatePassword)
 	authed.GET("/users", middleware.RoleAuth("admin"), authHandler.ListUsers)
 	authed.POST("/users", middleware.RoleAuth("admin"), authHandler.CreateUser)
+	authed.GET("/users/:id/clusters", middleware.RoleAuth("admin"), authHandler.ListUserClusters)
+	authed.PUT("/users/:id/clusters", middleware.RoleAuth("admin"), authHandler.SetUserClusters)
+	authed.GET("/users/:id/namespaces", middleware.RoleAuth("admin"), authHandler.ListUserNamespaces)
+	authed.PUT("/users/:id/namespaces", middleware.RoleAuth("admin"), authHandler.SetUserNamespaces)
 
 	// 集群管理
 	clusterHandler := cluster.NewHandler(db, k8sMgr)
@@ -62,14 +69,22 @@ func Setup(r *gin.Engine, db *gorm.DB, k8sMgr *k8sclient.Manager, logger *zap.Lo
 	authed.GET("/clusters/:id/overview", clusterHandler.Overview)
 	authed.GET("/clusters/overview", clusterHandler.MultiOverview)
 
+	// 通用 YAML Apply 与原始资源获取（编辑 YAML 用）
+	applyHandler := apply.NewHandler(k8sMgr)
+	authed.POST("/apply", middleware.RoleAuth("admin", "operator"), applyHandler.Apply)
+	authed.GET("/raw", applyHandler.GetRaw)
+
 	// 命名空间（按集群）
 	workloadHandler := workload.NewHandler(k8sMgr)
 	authed.GET("/namespaces", workloadHandler.ListNamespaces)
+	authed.POST("/namespaces", middleware.RoleAuth("admin", "operator"), workloadHandler.CreateNamespace)
+	authed.DELETE("/namespaces/:name", middleware.RoleAuth("admin"), workloadHandler.DeleteNamespace)
 
 	// 节点管理
 	nodeHandler := node.NewHandler(k8sMgr)
 	authed.GET("/nodes", nodeHandler.List)
 	authed.GET("/nodes/:name", nodeHandler.Get)
+	authed.PUT("/nodes/:name", middleware.RoleAuth("admin", "operator"), nodeHandler.Update)
 	authed.GET("/nodes/:name/pods", nodeHandler.Pods)
 	authed.GET("/nodes/:name/events", nodeHandler.Events)
 
@@ -88,6 +103,16 @@ func Setup(r *gin.Engine, db *gorm.DB, k8sMgr *k8sclient.Manager, logger *zap.Lo
 	authed.GET("/pods", workloadHandler.ListPods)
 	authed.GET("/pods/:name", workloadHandler.GetPod)
 	authed.DELETE("/pods/:name", middleware.RoleAuth("admin", "operator"), workloadHandler.DeletePod)
+	// Jobs
+	authed.GET("/jobs", workloadHandler.ListJobs)
+	authed.GET("/jobs/:name", workloadHandler.GetJob)
+	authed.POST("/jobs", middleware.RoleAuth("admin", "operator"), workloadHandler.CreateJob)
+	authed.DELETE("/jobs/:name", middleware.RoleAuth("admin", "operator"), workloadHandler.DeleteJob)
+	// CronJobs
+	authed.GET("/cronjobs", workloadHandler.ListCronJobs)
+	authed.GET("/cronjobs/:name", workloadHandler.GetCronJob)
+	authed.POST("/cronjobs", middleware.RoleAuth("admin", "operator"), workloadHandler.CreateCronJob)
+	authed.DELETE("/cronjobs/:name", middleware.RoleAuth("admin", "operator"), workloadHandler.DeleteCronJob)
 	// Pod WebSocket：日志 + 终端
 	authed.GET("/pods/:name/logs", workloadHandler.PodLogs)
 	authed.GET("/pods/:name/exec", workloadHandler.PodExec)
@@ -101,12 +126,16 @@ func Setup(r *gin.Engine, db *gorm.DB, k8sMgr *k8sclient.Manager, logger *zap.Lo
 	authed.DELETE("/configmaps/:name", middleware.RoleAuth("admin", "operator"), configHandler.DeleteConfigMap)
 	authed.GET("/secrets", configHandler.ListSecrets)
 	authed.GET("/secrets/:name", configHandler.GetSecret)
+	authed.POST("/secrets", middleware.RoleAuth("admin", "operator"), configHandler.CreateSecret)
+	authed.PUT("/secrets/:name", middleware.RoleAuth("admin", "operator"), configHandler.UpdateSecret)
 	authed.DELETE("/secrets/:name", middleware.RoleAuth("admin", "operator"), configHandler.DeleteSecret)
 
 	// 存储管理
 	storageHandler := storage.NewHandler(k8sMgr)
 	authed.GET("/storageclasses", storageHandler.ListStorageClasses)
 	authed.GET("/storageclasses/:name", storageHandler.GetStorageClass)
+	authed.GET("/pvs", storageHandler.ListPVs)
+	authed.GET("/pvs/:name", storageHandler.GetPV)
 	authed.GET("/pvcs", storageHandler.ListPVCs)
 	authed.GET("/pvcs/:name", storageHandler.GetPVC)
 	authed.DELETE("/pvcs/:name", middleware.RoleAuth("admin", "operator"), storageHandler.DeletePVC)
@@ -115,9 +144,13 @@ func Setup(r *gin.Engine, db *gorm.DB, k8sMgr *k8sclient.Manager, logger *zap.Lo
 	networkHandler := network.NewHandler(k8sMgr)
 	authed.GET("/services", networkHandler.ListServices)
 	authed.GET("/services/:name", networkHandler.GetService)
+	authed.POST("/services", middleware.RoleAuth("admin", "operator"), networkHandler.CreateService)
+	authed.PUT("/services/:name", middleware.RoleAuth("admin", "operator"), networkHandler.UpdateService)
 	authed.DELETE("/services/:name", middleware.RoleAuth("admin", "operator"), networkHandler.DeleteService)
 	authed.GET("/ingresses", networkHandler.ListIngresses)
 	authed.GET("/ingresses/:name", networkHandler.GetIngress)
+	authed.POST("/ingresses", middleware.RoleAuth("admin", "operator"), networkHandler.CreateIngress)
+	authed.PUT("/ingresses/:name", middleware.RoleAuth("admin", "operator"), networkHandler.UpdateIngress)
 	authed.DELETE("/ingresses/:name", middleware.RoleAuth("admin", "operator"), networkHandler.DeleteIngress)
 
 	// Prometheus 监控代理（需配置 PROMETHEUS_URL）
@@ -125,10 +158,33 @@ func Setup(r *gin.Engine, db *gorm.DB, k8sMgr *k8sclient.Manager, logger *zap.Lo
 	authed.GET("/monitor/prometheus/query", monitorHandler.Query)
 	authed.GET("/monitor/prometheus/query_range", monitorHandler.QueryRange)
 
+	// HPA
+	hpaHandler := hpa.NewHandler(k8sMgr)
+	authed.GET("/hpas", hpaHandler.List)
+	authed.GET("/hpas/:name", hpaHandler.Get)
+	authed.POST("/hpas", middleware.RoleAuth("admin", "operator"), hpaHandler.Create)
+	authed.PUT("/hpas/:name", middleware.RoleAuth("admin", "operator"), hpaHandler.Update)
+	authed.DELETE("/hpas/:name", middleware.RoleAuth("admin", "operator"), hpaHandler.Delete)
+
+	// K8s RBAC（Role/ClusterRole/RoleBinding/ClusterRoleBinding）
+	rbacHandler := rbac.NewHandler(k8sMgr)
+	authed.GET("/rbac/roles", rbacHandler.ListRoles)
+	authed.GET("/rbac/roles/:name", rbacHandler.GetRole)
+	authed.GET("/rbac/clusterroles", rbacHandler.ListClusterRoles)
+	authed.GET("/rbac/clusterroles/:name", rbacHandler.GetClusterRole)
+	authed.GET("/rbac/rolebindings", rbacHandler.ListRoleBindings)
+	authed.GET("/rbac/rolebindings/:name", rbacHandler.GetRoleBinding)
+	authed.GET("/rbac/clusterrolebindings", rbacHandler.ListClusterRoleBindings)
+	authed.GET("/rbac/clusterrolebindings/:name", rbacHandler.GetClusterRoleBinding)
+
 	// CRD 列表与实例（按集群）
 	crdHandler := crd.NewHandler(k8sMgr)
 	authed.GET("/crds", crdHandler.List)
 	authed.GET("/crds/:name/instances", crdHandler.ListInstances)
+	authed.GET("/crds/:name/instances/:iname", crdHandler.GetInstance)
+	authed.POST("/crds/:name/instances", middleware.RoleAuth("admin", "operator"), crdHandler.CreateInstance)
+	authed.PUT("/crds/:name/instances/:iname", middleware.RoleAuth("admin", "operator"), crdHandler.UpdateInstance)
+	authed.DELETE("/crds/:name/instances/:iname", middleware.RoleAuth("admin", "operator"), crdHandler.DeleteInstance)
 
 	// 审计、系统配置、告警、备份、模板（生产级）
 	auditHandler := audit.NewHandler(db)

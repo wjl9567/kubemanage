@@ -1,4 +1,5 @@
 import React from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Row, Col, Card, Statistic, Progress, Tag, Table, Typography, Space, Button, Tooltip } from 'antd'
 import {
   NodeIndexOutlined, ContainerOutlined, AppstoreOutlined, DatabaseOutlined,
@@ -13,6 +14,7 @@ import TopologyGraph from '@/components/TopologyGraph'
 const { Title, Text } = Typography
 
 export default function Overview() {
+  const navigate = useNavigate()
   const clusterId = useAuthStore((s) => s.currentCluster) || 1
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['cluster-overview', clusterId],
@@ -31,12 +33,12 @@ export default function Overview() {
   const memPercent = overview.memory_capacity ? Math.round((overview.memory_usage / overview.memory_capacity) * 100) : 0
 
   const statCards = [
-    { title: '节点数', value: overview.node_count || 0, ready: overview.node_ready, icon: <NodeIndexOutlined />, color: '#1677ff' },
-    { title: 'Pod数', value: overview.pod_count || 0, extra: `运行中: ${overview.pod_running || 0}`, icon: <ContainerOutlined />, color: '#52c41a' },
-    { title: '工作负载', value: overview.deployment_count || 0, icon: <AppstoreOutlined />, color: '#722ed1' },
-    { title: '命名空间', value: overview.namespace_count || 0, icon: <CloudServerOutlined />, color: '#13c2c2' },
-    { title: 'Service', value: overview.service_count || 0, icon: <ApiOutlined />, color: '#fa8c16' },
-    { title: 'PVC', value: overview.pvc_count || 0, icon: <DatabaseOutlined />, color: '#eb2f96' },
+    { title: '节点数', value: overview.node_count || 0, ready: overview.node_ready, icon: <NodeIndexOutlined />, color: '#1677ff', path: '/nodes' },
+    { title: 'Pod数', value: overview.pod_count || 0, extra: `运行中: ${overview.pod_running || 0}`, icon: <ContainerOutlined />, color: '#52c41a', path: '/workloads/pods' },
+    { title: '工作负载', value: overview.deployment_count || 0, icon: <AppstoreOutlined />, color: '#722ed1', path: '/workloads/deployments' },
+    { title: '命名空间', value: overview.namespace_count || 0, icon: <CloudServerOutlined />, color: '#13c2c2', path: '/workloads/namespaces' },
+    { title: 'Service', value: overview.service_count || 0, icon: <ApiOutlined />, color: '#fa8c16', path: '/network/services' },
+    { title: 'PVC', value: overview.pvc_count || 0, icon: <DatabaseOutlined />, color: '#eb2f96', path: '/storage/pvcs' },
   ]
 
   // 资源使用率饼图
@@ -99,21 +101,28 @@ export default function Overview() {
         <Button icon={<ReloadOutlined />} onClick={() => refetch()}>刷新</Button>
       </div>
 
-      {/* 核心指标卡片 */}
+      {/* 核心指标卡片 - 点击跳转对应业务页 */}
       <Row gutter={[16, 16]}>
         {statCards.map((item) => (
           <Col xs={12} sm={8} md={4} key={item.title}>
-            <Card size="small" hoverable>
-              <Statistic
-                title={<Space>{item.icon}<span>{item.title}</span></Space>}
-                value={item.value}
-                valueStyle={{ color: item.color, fontSize: 28 }}
-              />
-              {item.extra && <Text type="secondary" style={{ fontSize: 12 }}>{item.extra}</Text>}
-              {item.ready !== undefined && (
-                <Text type="secondary" style={{ fontSize: 12 }}>就绪: {item.ready}/{item.value}</Text>
-              )}
-            </Card>
+            <Tooltip title={`点击进入 ${item.title}`}>
+              <Card
+                size="small"
+                hoverable
+                onClick={() => item.path && navigate(item.path)}
+                style={{ cursor: item.path ? 'pointer' : 'default' }}
+              >
+                <Statistic
+                  title={<Space>{item.icon}<span>{item.title}</span></Space>}
+                  value={item.value}
+                  valueStyle={{ color: item.color, fontSize: 28 }}
+                />
+                {item.extra && <Text type="secondary" style={{ fontSize: 12 }}>{item.extra}</Text>}
+                {item.ready !== undefined && (
+                  <Text type="secondary" style={{ fontSize: 12 }}>就绪: {item.ready}/{item.value}</Text>
+                )}
+              </Card>
+            </Tooltip>
           </Col>
         ))}
       </Row>

@@ -4,6 +4,8 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	k8sclient "github.com/kubemanage/backend/internal/k8s/client"
 	"github.com/kubemanage/backend/internal/k8s/resource"
 	"github.com/kubemanage/backend/internal/pkg/response"
@@ -59,6 +61,50 @@ func (h *Handler) GetService(c *gin.Context) {
 	response.Success(c, s)
 }
 
+func (h *Handler) CreateService(c *gin.Context) {
+	svc, err := h.getSvc(c)
+	if err != nil { response.Error(c, response.ErrCodeClusterConnFail, err.Error()); return }
+	var body corev1.Service
+	if err := c.ShouldBindJSON(&body); err != nil {
+		response.BadRequest(c, "请求体格式错误: "+err.Error())
+		return
+	}
+	ns := body.Namespace
+	if ns == "" { ns = "default" }
+	result, err := svc.CreateService(c.Request.Context(), ns, &body)
+	if err != nil {
+		response.Error(c, response.ErrCodeK8sApiFail, err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *Handler) UpdateService(c *gin.Context) {
+	svc, err := h.getSvc(c)
+	if err != nil { response.Error(c, response.ErrCodeClusterConnFail, err.Error()); return }
+	namespace := c.Query("namespace")
+	if namespace == "" { namespace = "default" }
+	name := c.Param("name")
+	existing, err := svc.GetService(c.Request.Context(), namespace, name)
+	if err != nil {
+		response.Error(c, response.ErrCodeResourceNotFound, err.Error())
+		return
+	}
+	var body corev1.Service
+	if err := c.ShouldBindJSON(&body); err != nil {
+		response.BadRequest(c, "请求体格式错误: "+err.Error())
+		return
+	}
+	body.ResourceVersion = existing.ResourceVersion
+	body.UID = existing.UID
+	result, err := svc.UpdateService(c.Request.Context(), namespace, &body)
+	if err != nil {
+		response.Error(c, response.ErrCodeK8sApiFail, err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
 func (h *Handler) DeleteService(c *gin.Context) {
 	svc, err := h.getSvc(c)
 	if err != nil { response.Error(c, response.ErrCodeClusterConnFail, err.Error()); return }
@@ -107,6 +153,50 @@ func (h *Handler) GetIngress(c *gin.Context) {
 	ing, err := svc.GetIngress(c.Request.Context(), c.Query("namespace"), c.Param("name"))
 	if err != nil { response.Error(c, response.ErrCodeResourceNotFound, err.Error()); return }
 	response.Success(c, ing)
+}
+
+func (h *Handler) CreateIngress(c *gin.Context) {
+	svc, err := h.getSvc(c)
+	if err != nil { response.Error(c, response.ErrCodeClusterConnFail, err.Error()); return }
+	var body networkingv1.Ingress
+	if err := c.ShouldBindJSON(&body); err != nil {
+		response.BadRequest(c, "请求体格式错误: "+err.Error())
+		return
+	}
+	ns := body.Namespace
+	if ns == "" { ns = "default" }
+	result, err := svc.CreateIngress(c.Request.Context(), ns, &body)
+	if err != nil {
+		response.Error(c, response.ErrCodeK8sApiFail, err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *Handler) UpdateIngress(c *gin.Context) {
+	svc, err := h.getSvc(c)
+	if err != nil { response.Error(c, response.ErrCodeClusterConnFail, err.Error()); return }
+	namespace := c.Query("namespace")
+	if namespace == "" { namespace = "default" }
+	name := c.Param("name")
+	existing, err := svc.GetIngress(c.Request.Context(), namespace, name)
+	if err != nil {
+		response.Error(c, response.ErrCodeResourceNotFound, err.Error())
+		return
+	}
+	var body networkingv1.Ingress
+	if err := c.ShouldBindJSON(&body); err != nil {
+		response.BadRequest(c, "请求体格式错误: "+err.Error())
+		return
+	}
+	body.ResourceVersion = existing.ResourceVersion
+	body.UID = existing.UID
+	result, err := svc.UpdateIngress(c.Request.Context(), namespace, &body)
+	if err != nil {
+		response.Error(c, response.ErrCodeK8sApiFail, err.Error())
+		return
+	}
+	response.Success(c, result)
 }
 
 func (h *Handler) DeleteIngress(c *gin.Context) {

@@ -9,7 +9,7 @@ import {
   AlertOutlined, FileSearchOutlined, SettingOutlined, MenuFoldOutlined,
   MenuUnfoldOutlined, BellOutlined, SearchOutlined, UserOutlined,
   LogoutOutlined, MoonOutlined, SunOutlined, CloudServerOutlined,
-  KeyOutlined, HddOutlined, ShareAltOutlined, GatewayOutlined, CodeOutlined,
+  KeyOutlined, HddOutlined, ShareAltOutlined, GatewayOutlined, CodeOutlined, SafetyOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
@@ -25,10 +25,14 @@ const menuItems = [
   {
     key: 'workloads', icon: <AppstoreOutlined />, label: '工作负载',
     children: [
+      { key: '/workloads/namespaces', icon: <ContainerOutlined />, label: '命名空间' },
       { key: '/workloads/deployments', icon: <ContainerOutlined />, label: 'Deployments' },
       { key: '/workloads/statefulsets', icon: <ContainerOutlined />, label: 'StatefulSets' },
       { key: '/workloads/daemonsets', icon: <ContainerOutlined />, label: 'DaemonSets' },
       { key: '/workloads/pods', icon: <ContainerOutlined />, label: 'Pods' },
+      { key: '/workloads/jobs', icon: <ContainerOutlined />, label: 'Jobs' },
+      { key: '/workloads/cronjobs', icon: <ContainerOutlined />, label: 'CronJobs' },
+      { key: '/workloads/hpas', icon: <ContainerOutlined />, label: 'HPA' },
     ],
   },
   {
@@ -43,6 +47,7 @@ const menuItems = [
     children: [
       { key: '/storage/classes', icon: <HddOutlined />, label: '存储类' },
       { key: '/storage/pvcs', icon: <DatabaseOutlined />, label: 'PVC' },
+      { key: '/storage/pvs', icon: <DatabaseOutlined />, label: 'PV' },
     ],
   },
   {
@@ -53,6 +58,7 @@ const menuItems = [
     ],
   },
   { key: '/crd', icon: <CodeOutlined />, label: 'CRD 管理' },
+  { key: '/rbac', icon: <SafetyOutlined />, label: 'RBAC' },
   { key: '/monitor', icon: <AlertOutlined />, label: '监控告警' },
   { key: '/logging', icon: <FileSearchOutlined />, label: '日志分析' },
   { key: '/templates', icon: <FileTextOutlined />, label: '模板管理' },

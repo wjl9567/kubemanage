@@ -165,3 +165,38 @@ func (h *Handler) Events(c *gin.Context) {
 	}
 	response.Success(c, gin.H{"list": items, "total": len(items)})
 }
+
+// Update 更新节点（如标签、污点）
+func (h *Handler) Update(c *gin.Context) {
+	svc, err := h.getResourceSvc(c)
+	if err != nil {
+		response.Error(c, response.ErrCodeClusterConnFail, err.Error())
+		return
+	}
+	name := c.Param("name")
+	node, err := svc.GetNode(c.Request.Context(), name)
+	if err != nil {
+		response.Error(c, response.ErrCodeResourceNotFound, err.Error())
+		return
+	}
+	var body struct {
+		Labels map[string]string `json:"labels"`
+		Taints []corev1.Taint     `json:"taints"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		response.BadRequest(c, "请求体无效: "+err.Error())
+		return
+	}
+	if body.Labels != nil {
+		node.Labels = body.Labels
+	}
+	if body.Taints != nil {
+		node.Spec.Taints = body.Taints
+	}
+	result, err := svc.UpdateNode(c.Request.Context(), node)
+	if err != nil {
+		response.Error(c, response.ErrCodeK8sApiFail, err.Error())
+		return
+	}
+	response.Success(c, result)
+}

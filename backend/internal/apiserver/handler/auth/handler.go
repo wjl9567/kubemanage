@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"fmt"
+
 	"github.com/gin-gonic/gin"
 	"github.com/kubemanage/backend/internal/model"
 	"github.com/kubemanage/backend/internal/pkg/auth"
@@ -161,4 +163,93 @@ func (h *Handler) UpdatePassword(c *gin.Context) {
 	}
 	h.db.Model(&user).Update("password", string(hash))
 	response.SuccessMessage(c, "密码修改成功")
+}
+
+// ListUserClusters 获取用户已授权集群 ID 列表（admin 可查任意用户）
+func (h *Handler) ListUserClusters(c *gin.Context) {
+	uidStr := c.Param("id")
+	var targetUserID uint
+	if _, err := fmt.Sscanf(uidStr, "%d", &targetUserID); err != nil || targetUserID == 0 {
+		response.BadRequest(c, "无效的用户 ID")
+		return
+	}
+	var list []model.UserCluster
+	h.db.Where("user_id = ?", targetUserID).Find(&list)
+	ids := make([]uint, 0, len(list))
+	for _, uc := range list {
+		ids = append(ids, uc.ClusterID)
+	}
+	response.Success(c, gin.H{"user_id": targetUserID, "cluster_ids": ids})
+}
+
+// SetUserClusters 设置用户可访问集群（覆盖）
+func (h *Handler) SetUserClusters(c *gin.Context) {
+	uidStr := c.Param("id")
+	var targetUserID uint
+	if _, err := fmt.Sscanf(uidStr, "%d", &targetUserID); err != nil || targetUserID == 0 {
+		response.BadRequest(c, "无效的用户 ID")
+		return
+	}
+	var req struct {
+		ClusterIDs []uint `json:"cluster_ids"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "参数错误")
+		return
+	}
+	h.db.Where("user_id = ?", targetUserID).Delete(&model.UserCluster{})
+	for _, cid := range req.ClusterIDs {
+		if cid > 0 {
+			h.db.Create(&model.UserCluster{UserID: targetUserID, ClusterID: cid})
+		}
+	}
+	response.SuccessMessage(c, "已更新用户集群授权")
+}
+
+// ListUserNamespaces 获取用户在某集群下已授权命名空间（admin 可查任意用户）
+func (h *Handler) ListUserNamespaces(c *gin.Context) {
+	uidStr := c.Param("id")
+	var targetUserID uint
+	if _, err := fmt.Sscanf(uidStr, "%d", &targetUserID); err != nil || targetUserID == 0 {
+		response.BadRequest(c, "无效的用户 ID")
+		return
+	}
+	clusterIDStr := c.Query("cluster_id")
+	var clusterID uint
+	if _, err := fmt.Sscanf(clusterIDStr, "%d", &clusterID); err != nil || clusterID == 0 {
+		response.BadRequest(c, "缺少或无效的 cluster_id")
+		return
+	}
+	var list []model.UserNamespace
+	h.db.Where("user_id = ? AND cluster_id = ?", targetUserID, clusterID).Find(&list)
+	names := make([]string, 0, len(list))
+	for _, un := range list {
+		names = append(names, un.Namespace)
+	}
+	response.Success(c, gin.H{"user_id": targetUserID, "cluster_id": clusterID, "namespaces": names})
+}
+
+// SetUserNamespaces 设置用户在某集群下可访问命名空间（覆盖，空表示不限制）
+func (h *Handler) SetUserNamespaces(c *gin.Context) {
+	uidStr := c.Param("id")
+	var targetUserID uint
+	if _, err := fmt.Sscanf(uidStr, "%d", &targetUserID); err != nil || targetUserID == 0 {
+		response.BadRequest(c, "无效的用户 ID")
+		return
+	}
+	var req struct {
+		ClusterID  uint     `json:"cluster_id" binding:"required"`
+		Namespaces []string `json:"namespaces"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "参数错误")
+		return
+	}
+	h.db.Where("user_id = ? AND cluster_id = ?", targetUserID, req.ClusterID).Delete(&model.UserNamespace{})
+	for _, ns := range req.Namespaces {
+		if ns != "" {
+			h.db.Create(&model.UserNamespace{UserID: targetUserID, ClusterID: req.ClusterID, Namespace: ns})
+		}
+	}
+	response.SuccessMessage(c, "已更新用户命名空间授权")
 }

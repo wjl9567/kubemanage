@@ -140,3 +140,72 @@ func (h *Handler) DeleteSecret(c *gin.Context) {
 	}
 	response.SuccessMessage(c, "Secret已删除")
 }
+
+func (h *Handler) CreateSecret(c *gin.Context) {
+	svc, err := h.getSvc(c)
+	if err != nil { response.Error(c, response.ErrCodeClusterConnFail, err.Error()); return }
+	var req struct {
+		Name      string            `json:"name" binding:"required"`
+		Namespace string            `json:"namespace"`
+		Type      string            `json:"type"` // Opaque, kubernetes.io/tls, etc.
+		Data      map[string]string `json:"data"`   // base64 编码的 value
+		StringData map[string]string `json:"string_data"` // 明文，服务端转 base64
+		Labels    map[string]string `json:"labels"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error()); return
+	}
+	ns := req.Namespace
+	if ns == "" { ns = "default" }
+	secretType := corev1.SecretType(req.Type)
+	if secretType == "" { secretType = corev1.SecretTypeOpaque }
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: req.Name, Namespace: ns, Labels: req.Labels},
+		Type:       secretType,
+	}
+	if len(req.StringData) > 0 {
+		secret.StringData = req.StringData
+	} else if len(req.Data) > 0 {
+		secret.Data = make(map[string][]byte)
+		for k, v := range req.Data {
+			secret.Data[k] = []byte(v) // 前端可传 base64 字符串或后端按 base64 解码
+		}
+	}
+	result, err := svc.CreateSecret(c.Request.Context(), ns, secret)
+	if err != nil {
+		response.Error(c, response.ErrCodeK8sApiFail, err.Error()); return
+	}
+	masked := make(map[string]string)
+	for k := range result.Data { masked[k] = "***" }
+	response.Success(c, gin.H{"name": result.Name, "namespace": result.Namespace, "data": masked})
+}
+
+func (h *Handler) UpdateSecret(c *gin.Context) {
+	svc, err := h.getSvc(c)
+	if err != nil { response.Error(c, response.ErrCodeClusterConnFail, err.Error()); return }
+	ns := c.Query("namespace")
+	name := c.Param("name")
+	if ns == "" { ns = "default" }
+	existing, err := svc.GetSecret(c.Request.Context(), ns, name)
+	if err != nil { response.Error(c, response.ErrCodeResourceNotFound, err.Error()); return }
+	var req struct {
+		Data      map[string]string `json:"data"`
+		StringData map[string]string `json:"string_data"`
+		Labels    map[string]string `json:"labels"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil { response.BadRequest(c, err.Error()); return }
+	if req.StringData != nil {
+		existing.StringData = req.StringData
+		existing.Data = nil
+	} else if req.Data != nil {
+		existing.Data = make(map[string][]byte)
+		for k, v := range req.Data { existing.Data[k] = []byte(v) }
+		existing.StringData = nil
+	}
+	if req.Labels != nil { existing.Labels = req.Labels }
+	result, err := svc.UpdateSecret(c.Request.Context(), ns, existing)
+	if err != nil { response.Error(c, response.ErrCodeK8sApiFail, err.Error()); return }
+	masked := make(map[string]string)
+	for k := range result.Data { masked[k] = "***" }
+	response.Success(c, gin.H{"name": result.Name, "namespace": result.Namespace, "data": masked})
+}

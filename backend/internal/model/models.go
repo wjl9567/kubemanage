@@ -157,6 +157,21 @@ type SystemConfig struct {
 	Category  string         `json:"category" gorm:"size:64"`
 }
 
+// UserCluster 用户可访问的集群（非 admin 时按此过滤）
+type UserCluster struct {
+	ID        uint `json:"id" gorm:"primarykey"`
+	UserID    uint `json:"user_id" gorm:"uniqueIndex:uid_cid;not null"`
+	ClusterID uint `json:"cluster_id" gorm:"uniqueIndex:uid_cid;not null"`
+}
+
+// UserNamespace 用户在某集群下可访问的命名空间（为空表示该集群下全部可访问）
+type UserNamespace struct {
+	ID        uint   `json:"id" gorm:"primarykey"`
+	UserID    uint   `json:"user_id" gorm:"uniqueIndex:uid_cid_ns;not null"`
+	ClusterID uint   `json:"cluster_id" gorm:"uniqueIndex:uid_cid_ns;not null"`
+	Namespace string `json:"namespace" gorm:"uniqueIndex:uid_cid_ns;size:128;not null"`
+}
+
 // Backup 备份记录
 type Backup struct {
 	ID        uint      `json:"id" gorm:"primarykey"`

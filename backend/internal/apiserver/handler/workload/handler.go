@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -58,6 +59,51 @@ func (h *Handler) ListNamespaces(c *gin.Context) {
 		items = append(items, gin.H{"name": ns.Name, "status": string(ns.Status.Phase), "created_at": ns.CreationTimestamp})
 	}
 	response.Success(c, gin.H{"list": items, "total": len(items)})
+}
+
+func (h *Handler) CreateNamespace(c *gin.Context) {
+	svc, err := h.getSvc(c)
+	if err != nil {
+		response.Error(c, response.ErrCodeClusterConnFail, err.Error())
+		return
+	}
+	var req struct {
+		Name   string            `json:"name" binding:"required"`
+		Labels map[string]string `json:"labels"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	ns := &corev1.Namespace{}
+	ns.Name = req.Name
+	if req.Labels != nil {
+		ns.Labels = req.Labels
+	}
+	result, err := svc.CreateNamespace(c.Request.Context(), ns)
+	if err != nil {
+		response.Error(c, response.ErrCodeK8sApiFail, err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *Handler) DeleteNamespace(c *gin.Context) {
+	svc, err := h.getSvc(c)
+	if err != nil {
+		response.Error(c, response.ErrCodeClusterConnFail, err.Error())
+		return
+	}
+	name := c.Param("name")
+	if name == "" {
+		response.BadRequest(c, "缺少命名空间名称")
+		return
+	}
+	if err := svc.DeleteNamespace(c.Request.Context(), name); err != nil {
+		response.Error(c, response.ErrCodeK8sApiFail, err.Error())
+		return
+	}
+	response.SuccessMessage(c, "命名空间已删除")
 }
 
 // ==================== Deployments ====================
@@ -201,4 +247,108 @@ func (h *Handler) DeletePod(c *gin.Context) {
 		response.Error(c, response.ErrCodeK8sApiFail, err.Error()); return
 	}
 	response.SuccessMessage(c, "Pod已删除")
+}
+
+// ==================== Jobs ====================
+
+func (h *Handler) ListJobs(c *gin.Context) {
+	svc, err := h.getSvc(c)
+	if err != nil { response.Error(c, response.ErrCodeClusterConnFail, err.Error()); return }
+	list, err := svc.ListJobs(c.Request.Context(), c.Query("namespace"))
+	if err != nil { response.Error(c, response.ErrCodeK8sApiFail, err.Error()); return }
+	items := make([]gin.H, 0, len(list.Items))
+	for _, j := range list.Items {
+		suc := int32(0)
+		if j.Status.Succeeded > 0 { suc = j.Status.Succeeded }
+		fail := int32(0)
+		if j.Status.Failed > 0 { fail = j.Status.Failed }
+		items = append(items, gin.H{
+			"name": j.Name, "namespace": j.Namespace,
+			"completions": j.Status.Succeeded, "succeeded": suc, "failed": fail,
+			"active": j.Status.Active, "images": getImages(j.Spec.Template.Spec.Containers),
+			"created_at": j.CreationTimestamp,
+		})
+	}
+	response.Success(c, gin.H{"list": items, "total": len(items)})
+}
+
+func (h *Handler) GetJob(c *gin.Context) {
+	svc, err := h.getSvc(c)
+	if err != nil { response.Error(c, response.ErrCodeClusterConnFail, err.Error()); return }
+	j, err := svc.GetJob(c.Request.Context(), c.Query("namespace"), c.Param("name"))
+	if err != nil { response.Error(c, response.ErrCodeResourceNotFound, err.Error()); return }
+	response.Success(c, j)
+}
+
+func (h *Handler) CreateJob(c *gin.Context) {
+	svc, err := h.getSvc(c)
+	if err != nil { response.Error(c, response.ErrCodeClusterConnFail, err.Error()); return }
+	var job batchv1.Job
+	if err := c.ShouldBindJSON(&job); err != nil {
+		response.BadRequest(c, "请求体无效: "+err.Error()); return
+	}
+	ns := job.Namespace
+	if ns == "" { ns = "default" }
+	result, err := svc.CreateJob(c.Request.Context(), ns, &job)
+	if err != nil { response.Error(c, response.ErrCodeK8sApiFail, err.Error()); return }
+	response.Success(c, result)
+}
+
+func (h *Handler) DeleteJob(c *gin.Context) {
+	svc, err := h.getSvc(c)
+	if err != nil { response.Error(c, response.ErrCodeClusterConnFail, err.Error()); return }
+	if err := svc.DeleteJob(c.Request.Context(), c.Query("namespace"), c.Param("name")); err != nil {
+		response.Error(c, response.ErrCodeK8sApiFail, err.Error()); return
+	}
+	response.SuccessMessage(c, "Job已删除")
+}
+
+// ==================== CronJobs ====================
+
+func (h *Handler) ListCronJobs(c *gin.Context) {
+	svc, err := h.getSvc(c)
+	if err != nil { response.Error(c, response.ErrCodeClusterConnFail, err.Error()); return }
+	list, err := svc.ListCronJobs(c.Request.Context(), c.Query("namespace"))
+	if err != nil { response.Error(c, response.ErrCodeK8sApiFail, err.Error()); return }
+	items := make([]gin.H, 0, len(list.Items))
+	for _, cj := range list.Items {
+		items = append(items, gin.H{
+			"name": cj.Name, "namespace": cj.Namespace, "schedule": cj.Spec.Schedule,
+			"suspend": cj.Spec.Suspend != nil && *cj.Spec.Suspend,
+			"last_schedule": cj.Status.LastSuccessfulTime, "active": len(cj.Status.Active),
+			"created_at": cj.CreationTimestamp,
+		})
+	}
+	response.Success(c, gin.H{"list": items, "total": len(items)})
+}
+
+func (h *Handler) GetCronJob(c *gin.Context) {
+	svc, err := h.getSvc(c)
+	if err != nil { response.Error(c, response.ErrCodeClusterConnFail, err.Error()); return }
+	cj, err := svc.GetCronJob(c.Request.Context(), c.Query("namespace"), c.Param("name"))
+	if err != nil { response.Error(c, response.ErrCodeResourceNotFound, err.Error()); return }
+	response.Success(c, cj)
+}
+
+func (h *Handler) CreateCronJob(c *gin.Context) {
+	svc, err := h.getSvc(c)
+	if err != nil { response.Error(c, response.ErrCodeClusterConnFail, err.Error()); return }
+	var cj batchv1.CronJob
+	if err := c.ShouldBindJSON(&cj); err != nil {
+		response.BadRequest(c, "请求体无效: "+err.Error()); return
+	}
+	ns := cj.Namespace
+	if ns == "" { ns = "default" }
+	result, err := svc.CreateCronJob(c.Request.Context(), ns, &cj)
+	if err != nil { response.Error(c, response.ErrCodeK8sApiFail, err.Error()); return }
+	response.Success(c, result)
+}
+
+func (h *Handler) DeleteCronJob(c *gin.Context) {
+	svc, err := h.getSvc(c)
+	if err != nil { response.Error(c, response.ErrCodeClusterConnFail, err.Error()); return }
+	if err := svc.DeleteCronJob(c.Request.Context(), c.Query("namespace"), c.Param("name")); err != nil {
+		response.Error(c, response.ErrCodeK8sApiFail, err.Error()); return
+	}
+	response.SuccessMessage(c, "CronJob已删除")
 }

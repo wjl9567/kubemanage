@@ -9,14 +9,20 @@ const Login = lazy(() => import('@/modules/settings/Login'))
 const Overview = lazy(() => import('@/modules/overview'))
 const ClusterList = lazy(() => import('@/modules/cluster'))
 const NodeList = lazy(() => import('@/modules/node'))
+const Namespaces = lazy(() => import('@/modules/workload/Namespaces'))
 const Deployments = lazy(() => import('@/modules/workload/Deployments'))
 const StatefulSets = lazy(() => import('@/modules/workload/StatefulSets'))
 const DaemonSets = lazy(() => import('@/modules/workload/DaemonSets'))
 const Pods = lazy(() => import('@/modules/workload/Pods'))
+const Jobs = lazy(() => import('@/modules/workload/Jobs'))
+const CronJobs = lazy(() => import('@/modules/workload/CronJobs'))
+const HPAs = lazy(() => import('@/modules/workload/HPAs'))
 const ConfigMaps = lazy(() => import('@/modules/config/ConfigMaps'))
 const Secrets = lazy(() => import('@/modules/config/Secrets'))
 const StorageClasses = lazy(() => import('@/modules/storage/StorageClasses'))
 const PVCs = lazy(() => import('@/modules/storage/PVCs'))
+const PVs = lazy(() => import('@/modules/storage/PVs'))
+const RBACPage = lazy(() => import('@/modules/rbac'))
 const Services = lazy(() => import('@/modules/workload/Services'))
 const Ingresses = lazy(() => import('@/modules/workload/Ingresses'))
 const Monitoring = lazy(() => import('@/modules/monitor'))
@@ -53,14 +59,20 @@ export default function AppRoutes() {
                     <Route path="/overview" element={<Overview />} />
                     <Route path="/clusters" element={<ClusterList />} />
                     <Route path="/nodes" element={<NodeList />} />
+                    <Route path="/workloads/namespaces" element={<Namespaces />} />
                     <Route path="/workloads/deployments" element={<Deployments />} />
                     <Route path="/workloads/statefulsets" element={<StatefulSets />} />
                     <Route path="/workloads/daemonsets" element={<DaemonSets />} />
                     <Route path="/workloads/pods" element={<Pods />} />
+                    <Route path="/workloads/jobs" element={<Jobs />} />
+                    <Route path="/workloads/cronjobs" element={<CronJobs />} />
+                    <Route path="/workloads/hpas" element={<HPAs />} />
                     <Route path="/config/configmaps" element={<ConfigMaps />} />
                     <Route path="/config/secrets" element={<Secrets />} />
                     <Route path="/storage/classes" element={<StorageClasses />} />
                     <Route path="/storage/pvcs" element={<PVCs />} />
+                    <Route path="/storage/pvs" element={<PVs />} />
+                    <Route path="/rbac" element={<RBACPage />} />
                     <Route path="/network/services" element={<Services />} />
                     <Route path="/network/ingresses" element={<Ingresses />} />
                     <Route path="/monitor" element={<Monitoring />} />
