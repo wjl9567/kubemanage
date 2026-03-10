@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { Button, Space, Input, Tag, Switch, Select, Typography } from 'antd'
 import { ReloadOutlined, PauseOutlined, CaretRightOutlined, DownloadOutlined, ClearOutlined, SearchOutlined } from '@ant-design/icons'
+import { useAuthStore } from '@/stores/auth'
 
 const { Text } = Typography
 
@@ -21,6 +22,7 @@ const levelColor = (line: string) => {
 }
 
 export default function LogViewer({ podName, namespace, containers, clusterId }: LogViewerProps) {
+  const token = useAuthStore((s) => s.token)
   const [logs, setLogs] = useState<string[]>([])
   const [connected, setConnected] = useState(false)
   const [paused, setPaused] = useState(false)
@@ -39,7 +41,8 @@ export default function LogViewer({ podName, namespace, containers, clusterId }:
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const host = window.location.host
-    const url = `${protocol}//${host}/api/v1/pods/${podName}/logs?namespace=${namespace}&container=${container}&tail=${tailLines}&follow=true&cluster_id=${clusterId || 1}`
+    let url = `${protocol}//${host}/api/v1/pods/${podName}/logs?namespace=${namespace}&container=${container}&tail=${tailLines}&follow=true&cluster_id=${clusterId || 1}`
+    if (token) url += `&token=${encodeURIComponent(token)}`
 
     const ws = new WebSocket(url)
     wsRef.current = ws
@@ -56,7 +59,7 @@ export default function LogViewer({ podName, namespace, containers, clusterId }:
     }
     ws.onclose = () => setConnected(false)
     ws.onerror = () => setConnected(false)
-  }, [podName, namespace, container, tailLines, clusterId, paused])
+  }, [podName, namespace, container, tailLines, clusterId, token])
 
   useEffect(() => {
     connect()

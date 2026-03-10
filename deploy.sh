@@ -161,8 +161,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /kubemanage-server ./c
 # ===== Frontend Build =====
 FROM node:20-alpine AS frontend
 WORKDIR /app
-COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci --registry=https://registry.npmmirror.com
+COPY frontend/package*.json ./
+RUN npm ci --registry=https://registry.npmmirror.com || npm install --registry=https://registry.npmmirror.com
 COPY frontend/ .
 RUN npm run build
 

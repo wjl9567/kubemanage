@@ -81,6 +81,8 @@ func (h *Handler) ListUsers(c *gin.Context) {
 	response.Success(c, gin.H{"list": users, "total": total})
 }
 
+var allowedRoles = []string{"admin", "operator", "developer", "viewer"}
+
 // CreateUser 创建用户
 func (h *Handler) CreateUser(c *gin.Context) {
 	var req struct {
@@ -91,11 +93,32 @@ func (h *Handler) CreateUser(c *gin.Context) {
 		Role     string `json:"role" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, "参数错误："+err.Error())
+		response.BadRequest(c, "参数错误")
+		return
+	}
+	// 角色白名单，防止越权创建 admin
+	roleOK := false
+	for _, r := range allowedRoles {
+		if req.Role == r {
+			roleOK = true
+			break
+		}
+	}
+	if !roleOK {
+		response.BadRequest(c, "角色必须是 admin/operator/developer/viewer 之一")
+		return
+	}
+	currentRole, _ := c.Get("role")
+	if cr, ok := currentRole.(string); ok && cr == "operator" && req.Role == "admin" {
+		response.Forbidden(c, "operator 不能创建 admin 用户")
 		return
 	}
 
-	hash, _ := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		response.ServerError(c, "密码加密失败")
+		return
+	}
 	user := model.User{
 		Username: req.Username,
 		Password: string(hash),
@@ -131,7 +154,11 @@ func (h *Handler) UpdatePassword(c *gin.Context) {
 		return
 	}
 
-	hash, _ := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		response.ServerError(c, "密码加密失败")
+		return
+	}
 	h.db.Model(&user).Update("password", string(hash))
 	response.SuccessMessage(c, "密码修改成功")
 }

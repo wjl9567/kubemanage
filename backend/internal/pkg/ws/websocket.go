@@ -79,8 +79,8 @@ func (t *TerminalSession) Read(p []byte) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	copy(p, message)
-	return len(message), nil
+	n := copy(p, message)
+	return n, nil
 }
 
 // Write 实现 io.Writer —— 将终端输出写入 WebSocket

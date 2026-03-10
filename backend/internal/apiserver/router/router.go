@@ -67,9 +67,9 @@ func Setup(r *gin.Engine, db *gorm.DB, k8sMgr *k8sclient.Manager, logger *zap.Lo
 	// Deployments
 	authed.GET("/deployments", workloadHandler.ListDeployments)
 	authed.GET("/deployments/:name", workloadHandler.GetDeployment)
-	authed.PUT("/deployments/:name/scale", workloadHandler.ScaleDeployment)
-	authed.PUT("/deployments/:name/restart", workloadHandler.RestartDeployment)
-	authed.DELETE("/deployments/:name", workloadHandler.DeleteDeployment)
+	authed.PUT("/deployments/:name/scale", middleware.RoleAuth("admin", "operator"), workloadHandler.ScaleDeployment)
+	authed.PUT("/deployments/:name/restart", middleware.RoleAuth("admin", "operator"), workloadHandler.RestartDeployment)
+	authed.DELETE("/deployments/:name", middleware.RoleAuth("admin", "operator"), workloadHandler.DeleteDeployment)
 	// StatefulSets
 	authed.GET("/statefulsets", workloadHandler.ListStatefulSets)
 	// DaemonSets
@@ -77,7 +77,7 @@ func Setup(r *gin.Engine, db *gorm.DB, k8sMgr *k8sclient.Manager, logger *zap.Lo
 	// Pods
 	authed.GET("/pods", workloadHandler.ListPods)
 	authed.GET("/pods/:name", workloadHandler.GetPod)
-	authed.DELETE("/pods/:name", workloadHandler.DeletePod)
+	authed.DELETE("/pods/:name", middleware.RoleAuth("admin", "operator"), workloadHandler.DeletePod)
 	// Pod WebSocket：日志 + 终端
 	authed.GET("/pods/:name/logs", workloadHandler.PodLogs)
 	authed.GET("/pods/:name/exec", workloadHandler.PodExec)
@@ -86,12 +86,12 @@ func Setup(r *gin.Engine, db *gorm.DB, k8sMgr *k8sclient.Manager, logger *zap.Lo
 	configHandler := config.NewHandler(k8sMgr)
 	authed.GET("/configmaps", configHandler.ListConfigMaps)
 	authed.GET("/configmaps/:name", configHandler.GetConfigMap)
-	authed.POST("/configmaps", configHandler.CreateConfigMap)
-	authed.PUT("/configmaps/:name", configHandler.UpdateConfigMap)
-	authed.DELETE("/configmaps/:name", configHandler.DeleteConfigMap)
+	authed.POST("/configmaps", middleware.RoleAuth("admin", "operator"), configHandler.CreateConfigMap)
+	authed.PUT("/configmaps/:name", middleware.RoleAuth("admin", "operator"), configHandler.UpdateConfigMap)
+	authed.DELETE("/configmaps/:name", middleware.RoleAuth("admin", "operator"), configHandler.DeleteConfigMap)
 	authed.GET("/secrets", configHandler.ListSecrets)
 	authed.GET("/secrets/:name", configHandler.GetSecret)
-	authed.DELETE("/secrets/:name", configHandler.DeleteSecret)
+	authed.DELETE("/secrets/:name", middleware.RoleAuth("admin", "operator"), configHandler.DeleteSecret)
 
 	// 存储管理
 	storageHandler := storage.NewHandler(k8sMgr)
@@ -99,16 +99,16 @@ func Setup(r *gin.Engine, db *gorm.DB, k8sMgr *k8sclient.Manager, logger *zap.Lo
 	authed.GET("/storageclasses/:name", storageHandler.GetStorageClass)
 	authed.GET("/pvcs", storageHandler.ListPVCs)
 	authed.GET("/pvcs/:name", storageHandler.GetPVC)
-	authed.DELETE("/pvcs/:name", storageHandler.DeletePVC)
+	authed.DELETE("/pvcs/:name", middleware.RoleAuth("admin", "operator"), storageHandler.DeletePVC)
 
 	// 网络资源
 	networkHandler := network.NewHandler(k8sMgr)
 	authed.GET("/services", networkHandler.ListServices)
 	authed.GET("/services/:name", networkHandler.GetService)
-	authed.DELETE("/services/:name", networkHandler.DeleteService)
+	authed.DELETE("/services/:name", middleware.RoleAuth("admin", "operator"), networkHandler.DeleteService)
 	authed.GET("/ingresses", networkHandler.ListIngresses)
 	authed.GET("/ingresses/:name", networkHandler.GetIngress)
-	authed.DELETE("/ingresses/:name", networkHandler.DeleteIngress)
+	authed.DELETE("/ingresses/:name", middleware.RoleAuth("admin", "operator"), networkHandler.DeleteIngress)
 
 	// 前端静态资源与 SPA 回退（Docker 镜像内 ./web 为前端构建产物）
 	webRoot := "web"

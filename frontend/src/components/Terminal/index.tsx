@@ -4,6 +4,7 @@ import { FitAddon } from 'xterm-addon-fit'
 import { Tag, Select, Space, Button, Typography } from 'antd'
 import { CodeOutlined, ReloadOutlined, ExpandOutlined } from '@ant-design/icons'
 import 'xterm/css/xterm.css'
+import { useAuthStore } from '@/stores/auth'
 
 const { Text } = Typography
 
@@ -15,6 +16,7 @@ interface TerminalProps {
 }
 
 export default function PodTerminal({ podName, namespace, containers, clusterId }: TerminalProps) {
+  const token = useAuthStore((s) => s.token)
   const termRef = useRef<HTMLDivElement>(null)
   const xtermRef = useRef<XTerminal | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
@@ -66,7 +68,8 @@ export default function PodTerminal({ podName, namespace, containers, clusterId 
     // WebSocket 连接
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const host = window.location.host
-    const url = `${protocol}//${host}/api/v1/pods/${podName}/exec?namespace=${namespace}&container=${container}&cluster_id=${clusterId || 1}`
+    let url = `${protocol}//${host}/api/v1/pods/${podName}/exec?namespace=${namespace}&container=${container}&cluster_id=${clusterId || 1}`
+    if (token) url += `&token=${encodeURIComponent(token)}`
 
     term.writeln('\x1b[1;34m[KubeManage Terminal]\x1b[0m 正在连接...')
     term.writeln(`\x1b[90mPod: ${podName} | Container: ${container} | Namespace: ${namespace}\x1b[0m`)

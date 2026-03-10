@@ -13,6 +13,9 @@ func JWTAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := c.GetHeader("Authorization")
 		if token == "" {
+			token = c.Query("token") // WebSocket 无法带 Header，支持 URL 参数
+		}
+		if token == "" {
 			response.Unauthorized(c, "未提供认证令牌")
 			return
 		}

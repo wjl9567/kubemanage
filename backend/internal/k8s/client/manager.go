@@ -3,6 +3,7 @@ package client
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -44,7 +45,7 @@ func (m *Manager) AddCluster(id uint, name, kubeconfig string) error {
 	// 配置连接参数
 	config.QPS = 100
 	config.Burst = 200
-	config.Timeout = 30
+	config.Timeout = 30 * time.Second
 
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
@@ -64,7 +65,10 @@ func (m *Manager) AddCluster(id uint, name, kubeconfig string) error {
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
-
+	if old, ok := m.clients[id]; ok {
+		_ = old // 释放旧引用，便于 GC
+	}
+	delete(m.clients, id)
 	m.clients[id] = &ClusterClient{
 		ID:            id,
 		Name:          name,
@@ -91,6 +95,7 @@ func (m *Manager) AddClusterFromToken(id uint, name, apiServer, token, caCert st
 	}
 	config.QPS = 100
 	config.Burst = 200
+	config.Timeout = 30 * time.Second
 
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
@@ -102,11 +107,17 @@ func (m *Manager) AddClusterFromToken(id uint, name, apiServer, token, caCert st
 		return fmt.Errorf("创建动态客户端失败: %w", err)
 	}
 
-	metricsClient, _ := metricsv.NewForConfig(config)
+	metricsClient, err := metricsv.NewForConfig(config)
+	if err != nil {
+		metricsClient = nil
+	}
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
-
+	if old, ok := m.clients[id]; ok {
+		_ = old
+	}
+	delete(m.clients, id)
 	m.clients[id] = &ClusterClient{
 		ID:            id,
 		Name:          name,

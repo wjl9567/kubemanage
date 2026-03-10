@@ -6,15 +6,17 @@ import (
 	"os"
 
 	"github.com/gin-gonic/gin"
+	"github.com/glebarez/sqlite"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/postgres"
-	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 
 	k8sclient "github.com/kubemanage/backend/internal/k8s/client"
 	"github.com/kubemanage/backend/internal/apiserver/router"
 	"github.com/kubemanage/backend/internal/model"
+	"github.com/kubemanage/backend/internal/pkg/auth"
+	"github.com/kubemanage/backend/internal/pkg/encrypt"
 )
 
 func main() {
@@ -42,6 +44,14 @@ func main() {
 			log.Fatalf("SQLite 初始化失败: %v", err)
 		}
 		logger.Info("使用 SQLite 本地数据库: kubemanage.db")
+	}
+
+	// 安全配置：从环境变量读取密钥，生产环境必须设置
+	if s := os.Getenv("JWT_SECRET"); s != "" {
+		auth.SetJWTSecret(s)
+	}
+	if s := os.Getenv("ENCRYPT_KEY"); len(s) == 32 {
+		encrypt.SetEncryptionKey(s)
 	}
 
 	// 自动迁移
@@ -90,7 +100,10 @@ func initDefaultAdmin(db *gorm.DB) {
 	var count int64
 	db.Model(&model.User{}).Count(&count)
 	if count == 0 {
-		hash, _ := bcrypt.GenerateFromPassword([]byte("admin123"), bcrypt.DefaultCost)
+		hash, err := bcrypt.GenerateFromPassword([]byte("admin123"), bcrypt.DefaultCost)
+		if err != nil {
+			log.Fatalf("默认管理员密码哈希失败: %v", err)
+		}
 		db.Create(&model.User{
 			Username: "admin",
 			Password: string(hash),
@@ -107,8 +120,30 @@ func loadRegisteredClusters(db *gorm.DB, mgr *k8sclient.Manager, logger *zap.Log
 	db.Where("status = ?", "active").Find(&clusters)
 	for _, c := range clusters {
 		if c.KubeConfig != "" {
-			if err := mgr.AddCluster(c.ID, c.Name, c.KubeConfig); err != nil {
+			kubeConfig, err := encrypt.Decrypt(c.KubeConfig)
+			if err != nil {
+				logger.Warn("集群 KubeConfig 解密失败，跳过", zap.String("name", c.Name), zap.Error(err))
+				continue
+			}
+			if err := mgr.AddCluster(c.ID, c.Name, kubeConfig); err != nil {
 				logger.Warn("集群连接失败", zap.String("name", c.Name), zap.Error(err))
+			} else {
+				logger.Info("集群已连接", zap.String("name", c.Name))
+			}
+		} else if c.Token != "" && c.APIServer != "" {
+			token, err := encrypt.Decrypt(c.Token)
+			if err != nil {
+				logger.Warn("集群 Token 解密失败，跳过", zap.String("name", c.Name), zap.Error(err))
+				continue
+			}
+			caCert := c.CACert
+			if caCert != "" {
+				if dec, err := encrypt.Decrypt(caCert); err == nil {
+					caCert = dec
+				}
+			}
+			if err := mgr.AddClusterFromToken(c.ID, c.Name, c.APIServer, token, caCert); err != nil {
+				logger.Warn("集群(Token)连接失败", zap.String("name", c.Name), zap.Error(err))
 			} else {
 				logger.Info("集群已连接", zap.String("name", c.Name))
 			}
