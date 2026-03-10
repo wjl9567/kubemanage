@@ -7,8 +7,9 @@ import { monitorApi } from '@/services/api'
 
 const { Title, Text } = Typography
 
+type PromMatrixItem = { metric?: Record<string, string>; values?: [number, string][] }
 // 将 Prometheus query_range 的 result 转为 ECharts 可用的 xAxis + series
-function promResultToSeries(result: { metric?: Record<string, string }; values?: [number, string][] }[], name: string) {
+function promResultToSeries(result: PromMatrixItem[], _name: string) {
   if (!result?.length || !result[0].values?.length) return { xAxis: [] as string[], series: [] as number[] }
   const xAxis = result[0].values.map(([t]) => new Date(t * 1000).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }))
   const series = result[0].values.map(([, v]) => parseFloat(v))
