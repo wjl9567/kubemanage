@@ -14,6 +14,7 @@ export default function Pods() {
   const [namespace, setNamespace] = useState('')
   const [selected, setSelected] = useState<any>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [logPod, setLogPod] = useState<any>(null)
 
   const { data: nsData } = useQuery({ queryKey: ['namespaces', currentCluster], queryFn: () => namespaceApi.list(), enabled: !!currentCluster })
   const nsList = (nsData as any)?.data?.list ?? []
@@ -57,10 +58,11 @@ export default function Pods() {
     { title: '容器数', key: 'containers', render: (_: any, r: any) => r.containers?.length || 0, width: 80 },
     { title: '重启', dataIndex: 'restarts', key: 'restarts', width: 60, render: (v: number) => <Text type={v > 0 ? 'warning' : undefined}>{v}</Text> },
     {
-      title: '操作', key: 'action', width: 160,
+      title: '操作', key: 'action', width: 200,
       render: (_: any, r: any) => (
         <Space>
-          <Button size="small" icon={<FileTextOutlined />} onClick={() => { setSelected(r); setDrawerOpen(true) }}>日志</Button>
+          <Button size="small" icon={<FileTextOutlined />} onClick={() => setLogPod(r)}>日志</Button>
+          <Button size="small" icon={<ContainerOutlined />} onClick={() => { setSelected(r); setDrawerOpen(true) }}>详情</Button>
           <Popconfirm title="确认删除？" onConfirm={() => deleteMut.mutate({ name: r.name, ns: r.namespace })}>
             <Button size="small" danger icon={<DeleteOutlined />}>删除</Button>
           </Popconfirm>
@@ -124,6 +126,24 @@ export default function Pods() {
               ),
             },
           ]} />
+        )}
+      </Drawer>
+
+      {/* 日志弹窗 - 点击行内日志按钮直接展示 */}
+      <Drawer
+        title={`日志 - ${logPod?.name || ''}`}
+        open={!!logPod}
+        onClose={() => setLogPod(null)}
+        width={750}
+        destroyOnClose
+      >
+        {logPod && (
+          <LogViewer
+            podName={logPod.name}
+            namespace={logPod.namespace}
+            containers={logPod.containers || []}
+            clusterId={currentCluster ?? undefined}
+          />
         )}
       </Drawer>
     </div>

@@ -10,6 +10,7 @@ interface LogViewerProps {
   namespace: string
   containers: { name: string; image: string }[]
   clusterId?: number
+  defaultContainer?: string
 }
 
 // 日志级别颜色
@@ -21,13 +22,13 @@ const levelColor = (line: string) => {
   return '#d4d4d4'
 }
 
-export default function LogViewer({ podName, namespace, containers, clusterId }: LogViewerProps) {
+export default function LogViewer({ podName, namespace, containers, clusterId, defaultContainer }: LogViewerProps) {
   const token = useAuthStore((s) => s.token)
   const [logs, setLogs] = useState<string[]>([])
   const [connected, setConnected] = useState(false)
   const [paused, setPaused] = useState(false)
   const [keyword, setKeyword] = useState('')
-  const [container, setContainer] = useState(containers[0]?.name || '')
+  const [container, setContainer] = useState(defaultContainer || containers[0]?.name || '')
   const [autoScroll, setAutoScroll] = useState(true)
   const [tailLines, setTailLines] = useState(200)
   const wsRef = useRef<WebSocket | null>(null)
@@ -108,8 +109,11 @@ export default function LogViewer({ podName, namespace, containers, clusterId }:
       {/* 工具栏 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
         <Space size="small" wrap>
-          <Select size="small" value={container} onChange={setContainer} style={{ width: 160 }}
-            options={containers.map(c => ({ value: c.name, label: c.name }))} />
+          {containers.length > 1 && (
+            <Select size="small" value={container} onChange={setContainer} style={{ width: 160 }}
+              options={containers.map(c => ({ value: c.name, label: c.name }))} />
+          )}
+          {containers.length <= 1 && <Tag>{container || '-'}</Tag>}
           <Tag color={connected ? 'success' : 'error'}>{connected ? '已连接' : '未连接'}</Tag>
           <Text type="secondary" style={{ fontSize: 12 }}>{filteredLogs.length} 行</Text>
         </Space>

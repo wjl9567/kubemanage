@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import Editor from '@monaco-editor/react'
 import { Button, Space, Typography, Tag, Dropdown, message, Modal } from 'antd'
 import { CopyOutlined, DownloadOutlined, UploadOutlined, FormatPainterOutlined, FileTextOutlined } from '@ant-design/icons'
@@ -129,6 +129,11 @@ export default function YamlEditor({
 }: YamlEditorProps) {
   const [content, setContent] = useState(value)
   const [lineCount, setLineCount] = useState(0)
+
+  useEffect(() => {
+    setContent(value)
+    setLineCount(value.split('\n').length)
+  }, [value])
 
   const handleChange = useCallback((val: string | undefined) => {
     const v = val || ''

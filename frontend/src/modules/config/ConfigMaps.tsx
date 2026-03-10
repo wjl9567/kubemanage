@@ -1,9 +1,10 @@
 import React, { useState } from 'react'
 import { Card, Table, Tag, Button, Space, Typography, Select, Modal, Form, Input, message, Popconfirm, Drawer, Descriptions } from 'antd'
-import { FileTextOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, EyeOutlined } from '@ant-design/icons'
+import { FileTextOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, EyeOutlined, EditOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { configApi, namespaceApi } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
+import EditResourceModal from '@/components/EditResourceModal'
 
 const { Title } = Typography
 
@@ -12,6 +13,7 @@ export default function ConfigMaps() {
   const [namespace, setNamespace] = useState('default')
   const [createModal, setCreateModal] = useState(false)
   const [selected, setSelected] = useState<any>(null)
+  const [editTarget, setEditTarget] = useState<{ name: string; namespace: string } | null>(null)
   const [form] = Form.useForm()
   const queryClient = useQueryClient()
 
@@ -37,9 +39,10 @@ export default function ConfigMaps() {
     { title: '名称', dataIndex: 'name', key: 'name', render: (v: string) => <Space><FileTextOutlined style={{ color: '#1677ff' }} /><strong>{v}</strong></Space> },
     { title: '命名空间', dataIndex: 'namespace', key: 'namespace', render: (v: string) => <Tag>{v}</Tag> },
     { title: '数据条目', dataIndex: 'data_count', key: 'data_count' },
-    { title: '操作', key: 'action', render: (_: any, r: any) => (
+    { title: '操作', key: 'action', width: 220, render: (_: any, r: any) => (
       <Space>
         <Button size="small" icon={<EyeOutlined />} onClick={() => setSelected(r)}>查看</Button>
+        <Button size="small" icon={<EditOutlined />} onClick={() => setEditTarget({ name: r.name, namespace: r.namespace })}>编辑</Button>
         <Popconfirm title="确认删除？" onConfirm={() => deleteMut.mutate({ name: r.name, ns: r.namespace })}>
           <Button size="small" danger icon={<DeleteOutlined />}>删除</Button>
         </Popconfirm>
@@ -84,6 +87,17 @@ export default function ConfigMaps() {
           </div>
         )}
       </Drawer>
+
+      <EditResourceModal
+        open={!!editTarget}
+        onClose={() => setEditTarget(null)}
+        onSuccess={() => { refetch(); setEditTarget(null) }}
+        kind="ConfigMap"
+        apiVersion="v1"
+        namespace={editTarget?.namespace}
+        name={editTarget?.name || ''}
+        title={`编辑 ConfigMap: ${editTarget?.name}`}
+      />
     </div>
   )
 }
