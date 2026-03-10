@@ -40,6 +40,26 @@ func getImages(containers []corev1.Container) []string {
 	return imgs
 }
 
+// ==================== Namespaces ====================
+
+func (h *Handler) ListNamespaces(c *gin.Context) {
+	svc, err := h.getSvc(c)
+	if err != nil {
+		response.Error(c, response.ErrCodeClusterConnFail, err.Error())
+		return
+	}
+	list, err := svc.ListNamespaces(c.Request.Context())
+	if err != nil {
+		response.Error(c, response.ErrCodeK8sApiFail, err.Error())
+		return
+	}
+	items := make([]gin.H, 0, len(list.Items))
+	for _, ns := range list.Items {
+		items = append(items, gin.H{"name": ns.Name, "status": string(ns.Status.Phase), "created_at": ns.CreationTimestamp})
+	}
+	response.Success(c, gin.H{"list": items, "total": len(items)})
+}
+
 // ==================== Deployments ====================
 
 func (h *Handler) ListDeployments(c *gin.Context) {

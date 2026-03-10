@@ -1,24 +1,32 @@
 import React, { useState } from 'react'
 import { Card, Table, Tag, Button, Space, Typography, Modal, Form, Input, Select, Tabs, message, Popconfirm, Drawer } from 'antd'
-import { FileTextOutlined, PlusOutlined, ReloadOutlined, CopyOutlined, DeleteOutlined, EyeOutlined, EditOutlined } from '@ant-design/icons'
+import { FileTextOutlined, PlusOutlined, ReloadOutlined, CopyOutlined, DeleteOutlined, EyeOutlined } from '@ant-design/icons'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import YamlEditor from '@/components/YamlEditor'
+import { templateApi } from '@/services/api'
 
 const { Title } = Typography
-
-const mockTemplates = [
-  { id: 1, name: 'web-deployment', display_name: 'Web 应用 Deployment', type: 'deployment', category: 'production', description: '标准 Web 应用部署模板，含资源限制和健康检查', version: 1, tags: 'web,nginx,frontend', enabled: true, created_by: 'admin' },
-  { id: 2, name: 'api-service', display_name: 'API 服务模板', type: 'deployment', category: 'production', description: 'RESTful API 服务模板，含 HPA 配置', version: 3, tags: 'api,backend,go', enabled: true, created_by: 'admin' },
-  { id: 3, name: 'redis-config', display_name: 'Redis ConfigMap', type: 'configmap', category: 'general', description: 'Redis 标准配置模板', version: 1, tags: 'redis,cache', enabled: true, created_by: 'admin' },
-  { id: 4, name: 'tls-secret', display_name: 'TLS 证书 Secret', type: 'secret', category: 'production', description: 'HTTPS TLS 证书模板', version: 1, tags: 'tls,https,cert', enabled: true, created_by: 'admin' },
-  { id: 5, name: 'web-ingress', display_name: 'Web Ingress 规则', type: 'ingress', category: 'production', description: 'Nginx Ingress 路由规则模板', version: 2, tags: 'ingress,nginx,route', enabled: true, created_by: 'admin' },
-  { id: 6, name: 'test-deployment', display_name: '测试环境 Deployment', type: 'deployment', category: 'testing', description: '测试环境轻量部署模板，资源限制较低', version: 1, tags: 'test,dev', enabled: false, created_by: 'developer' },
-]
 
 export default function TemplateManagement() {
   const [createOpen, setCreateOpen] = useState(false)
   const [selected, setSelected] = useState<any>(null)
   const [yamlContent, setYamlContent] = useState('')
   const [form] = Form.useForm()
+  const queryClient = useQueryClient()
+
+  const { data: templatesRes, isLoading } = useQuery({ queryKey: ['templates'], queryFn: () => templateApi.list() })
+  const templates = (templatesRes as any)?.data?.list ?? []
+
+  const createMut = useMutation({
+    mutationFn: (v: any) => templateApi.create({ ...v, content: yamlContent || '# placeholder' }),
+    onSuccess: () => { message.success('模板创建成功'); setCreateOpen(false); form.resetFields(); queryClient.invalidateQueries({ queryKey: ['templates'] }) },
+    onError: (e: any) => message.error(e?.message || '创建失败'),
+  })
+  const deleteMut = useMutation({
+    mutationFn: (id: number) => templateApi.delete(id),
+    onSuccess: () => { message.success('已删除'); setSelected(null); queryClient.invalidateQueries({ queryKey: ['templates'] }) },
+    onError: (e: any) => message.error(e?.message || '删除失败'),
+  })
 
   const typeColor: Record<string, string> = { deployment: 'blue', configmap: 'green', secret: 'red', ingress: 'purple', service: 'orange' }
   const categoryColor: Record<string, string> = { production: 'green', testing: 'orange', general: 'default' }
@@ -36,9 +44,9 @@ export default function TemplateManagement() {
       render: (_: any, r: any) => (
         <Space>
           <Button size="small" icon={<EyeOutlined />} onClick={() => setSelected(r)}>查看</Button>
-          <Button size="small" icon={<CopyOutlined />} onClick={() => message.success('模板已复制')}>复制</Button>
-          <Popconfirm title="确认删除?" onConfirm={() => message.success('已删除')}>
-            <Button size="small" danger icon={<DeleteOutlined />}>删除</Button>
+          <Button size="small" icon={<CopyOutlined />} onClick={() => { if (r.content) { navigator.clipboard.writeText(r.content); message.success('已复制到剪贴板') } else message.warning('无内容') }}>复制</Button>
+          <Popconfirm title="确认删除?" onConfirm={() => deleteMut.mutate(r.id)}>
+            <Button size="small" danger icon={<DeleteOutlined />} loading={deleteMut.isPending}>删除</Button>
           </Popconfirm>
         </Space>
       ),
@@ -50,18 +58,18 @@ export default function TemplateManagement() {
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <Title level={4} style={{ margin: 0 }}><FileTextOutlined /> 模板管理</Title>
         <Space>
-          <Button icon={<ReloadOutlined />}>刷新</Button>
+          <Button icon={<ReloadOutlined />} onClick={() => queryClient.invalidateQueries({ queryKey: ['templates'] })}>刷新</Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>创建模板</Button>
         </Space>
       </div>
 
       <Card>
-        <Table columns={columns} dataSource={mockTemplates} rowKey="id" size="small" />
+        <Table columns={columns} dataSource={templates} rowKey="id" size="small" loading={isLoading} />
       </Card>
 
       {/* 创建模板弹窗 */}
       <Modal title="创建资源模板" open={createOpen} onCancel={() => setCreateOpen(false)} width={900}
-        onOk={() => { message.success('模板创建成功'); setCreateOpen(false) }}>
+        onOk={() => form.validateFields().then((v) => createMut.mutate(v))} confirmLoading={createMut.isPending}>
         <Tabs items={[
           {
             key: 'form', label: '基本信息',
@@ -105,7 +113,7 @@ export default function TemplateManagement() {
             },
             {
               key: 'yaml', label: 'YAML',
-              children: <YamlEditor readOnly height={400} title={selected.name + '.yaml'} />,
+              children: <YamlEditor readOnly value={selected.content || ''} height={400} title={selected.name + '.yaml'} />,
             },
           ]} />
         )}

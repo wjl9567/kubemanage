@@ -29,6 +29,10 @@ api.interceptors.response.use(
   (err) => {
     if (err.response?.status === 401) {
       useAuthStore.getState().logout()
+      const msg = err.response?.data?.message || ''
+      if (msg.includes('过期') || msg.includes('invalid') || msg.includes('无效')) {
+        sessionStorage.setItem('kubemanage_login_expired', '1')
+      }
       window.location.href = '/login'
     }
     return Promise.reject(err)
@@ -59,6 +63,11 @@ export const nodeApi = {
   get: (name: string) => api.get(`/nodes/${name}`),
   pods: (name: string) => api.get(`/nodes/${name}/pods`),
   events: (name: string) => api.get(`/nodes/${name}/events`),
+}
+
+// ==================== Namespaces ====================
+export const namespaceApi = {
+  list: (params?: any) => api.get('/namespaces', { params }),
 }
 
 // ==================== Workloads ====================
@@ -109,6 +118,47 @@ export const networkApi = {
   listIngresses: (params?: any) => api.get('/ingresses', { params }),
   getIngress: (name: string, ns: string) => api.get(`/ingresses/${name}`, { params: { namespace: ns } }),
   deleteIngress: (name: string, ns: string) => api.delete(`/ingresses/${name}`, { params: { namespace: ns } }),
+}
+
+// ==================== Audit / System / Alert / Backup / Template ====================
+export const auditApi = {
+  list: (params?: { page?: number; page_size?: number }) => api.get('/audit/logs', { params }),
+}
+export const systemApi = {
+  get: () => api.get('/system/config'),
+  update: (data: Record<string, string>) => api.put('/system/config', data),
+}
+export const alertChannelApi = {
+  list: () => api.get('/alert-channels'),
+  create: (data: any) => api.post('/alert-channels', data),
+  update: (id: number, data: any) => api.put(`/alert-channels/${id}`, data),
+  delete: (id: number) => api.delete(`/alert-channels/${id}`),
+}
+export const backupApi = {
+  list: () => api.get('/backups'),
+  create: (params?: { scope?: string }) => api.post('/backups', null, { params }),
+  /** 下载备份文件（需在调用处将返回的 blob 转为下载，见 settings 备份 tab） */
+  download: (id: number) => api.get(`/backups/${id}/download`, { responseType: 'blob' }),
+}
+// ==================== Monitor (Prometheus) ====================
+export const monitorApi = {
+  query: (params: { query: string }) => api.get('/monitor/prometheus/query', { params }),
+  queryRange: (params: { query: string; start?: string; end?: string; step?: string }) =>
+    api.get('/monitor/prometheus/query_range', { params }),
+}
+
+// ==================== CRD ====================
+export const crdApi = {
+  list: (params?: any) => api.get('/crds', { params }),
+  listInstances: (crdName: string, params?: { namespace?: string }) => api.get(`/crds/${crdName}/instances`, { params }),
+}
+
+export const templateApi = {
+  list: () => api.get('/templates'),
+  get: (id: number) => api.get(`/templates/${id}`),
+  create: (data: any) => api.post('/templates', data),
+  update: (id: number, data: any) => api.put(`/templates/${id}`, data),
+  delete: (id: number) => api.delete(`/templates/${id}`),
 }
 
 export default api

@@ -9,12 +9,19 @@ import (
 	"gorm.io/gorm"
 
 	k8sclient "github.com/kubemanage/backend/internal/k8s/client"
+	"github.com/kubemanage/backend/internal/apiserver/handler/alert"
+	"github.com/kubemanage/backend/internal/apiserver/handler/audit"
 	"github.com/kubemanage/backend/internal/apiserver/handler/auth"
+	"github.com/kubemanage/backend/internal/apiserver/handler/backup"
 	"github.com/kubemanage/backend/internal/apiserver/handler/cluster"
 	"github.com/kubemanage/backend/internal/apiserver/handler/config"
+	"github.com/kubemanage/backend/internal/apiserver/handler/crd"
 	"github.com/kubemanage/backend/internal/apiserver/handler/network"
 	"github.com/kubemanage/backend/internal/apiserver/handler/node"
 	"github.com/kubemanage/backend/internal/apiserver/handler/storage"
+	"github.com/kubemanage/backend/internal/apiserver/handler/system"
+	"github.com/kubemanage/backend/internal/apiserver/handler/monitor"
+	"github.com/kubemanage/backend/internal/apiserver/handler/template"
 	"github.com/kubemanage/backend/internal/apiserver/handler/workload"
 	"github.com/kubemanage/backend/internal/apiserver/middleware"
 )
@@ -55,6 +62,10 @@ func Setup(r *gin.Engine, db *gorm.DB, k8sMgr *k8sclient.Manager, logger *zap.Lo
 	authed.GET("/clusters/:id/overview", clusterHandler.Overview)
 	authed.GET("/clusters/overview", clusterHandler.MultiOverview)
 
+	// 命名空间（按集群）
+	workloadHandler := workload.NewHandler(k8sMgr)
+	authed.GET("/namespaces", workloadHandler.ListNamespaces)
+
 	// 节点管理
 	nodeHandler := node.NewHandler(k8sMgr)
 	authed.GET("/nodes", nodeHandler.List)
@@ -63,7 +74,6 @@ func Setup(r *gin.Engine, db *gorm.DB, k8sMgr *k8sclient.Manager, logger *zap.Lo
 	authed.GET("/nodes/:name/events", nodeHandler.Events)
 
 	// 工作负载
-	workloadHandler := workload.NewHandler(k8sMgr)
 	// Deployments
 	authed.GET("/deployments", workloadHandler.ListDeployments)
 	authed.GET("/deployments/:name", workloadHandler.GetDeployment)
@@ -109,6 +119,38 @@ func Setup(r *gin.Engine, db *gorm.DB, k8sMgr *k8sclient.Manager, logger *zap.Lo
 	authed.GET("/ingresses", networkHandler.ListIngresses)
 	authed.GET("/ingresses/:name", networkHandler.GetIngress)
 	authed.DELETE("/ingresses/:name", middleware.RoleAuth("admin", "operator"), networkHandler.DeleteIngress)
+
+	// Prometheus 监控代理（需配置 PROMETHEUS_URL）
+	monitorHandler := monitor.NewHandler()
+	authed.GET("/monitor/prometheus/query", monitorHandler.Query)
+	authed.GET("/monitor/prometheus/query_range", monitorHandler.QueryRange)
+
+	// CRD 列表与实例（按集群）
+	crdHandler := crd.NewHandler(k8sMgr)
+	authed.GET("/crds", crdHandler.List)
+	authed.GET("/crds/:name/instances", crdHandler.ListInstances)
+
+	// 审计、系统配置、告警、备份、模板（生产级）
+	auditHandler := audit.NewHandler(db)
+	authed.GET("/audit/logs", middleware.RoleAuth("admin"), auditHandler.List)
+	systemHandler := system.NewHandler(db)
+	authed.GET("/system/config", systemHandler.Get)
+	authed.PUT("/system/config", middleware.RoleAuth("admin"), systemHandler.Update)
+	alertHandler := alert.NewHandler(db)
+	authed.GET("/alert-channels", alertHandler.ListChannels)
+	authed.POST("/alert-channels", middleware.RoleAuth("admin"), alertHandler.CreateChannel)
+	authed.PUT("/alert-channels/:id", middleware.RoleAuth("admin"), alertHandler.UpdateChannel)
+	authed.DELETE("/alert-channels/:id", middleware.RoleAuth("admin"), alertHandler.DeleteChannel)
+	backupHandler := backup.NewHandler(db)
+	authed.GET("/backups", backupHandler.List)
+	authed.POST("/backups", middleware.RoleAuth("admin"), backupHandler.Create)
+	authed.GET("/backups/:id/download", middleware.RoleAuth("admin"), backupHandler.Download)
+	templateHandler := template.NewHandler(db)
+	authed.GET("/templates", templateHandler.List)
+	authed.GET("/templates/:id", templateHandler.Get)
+	authed.POST("/templates", middleware.RoleAuth("admin", "operator"), templateHandler.Create)
+	authed.PUT("/templates/:id", middleware.RoleAuth("admin", "operator"), templateHandler.Update)
+	authed.DELETE("/templates/:id", middleware.RoleAuth("admin", "operator"), templateHandler.Delete)
 
 	// 前端静态资源与 SPA 回退（Docker 镜像内 ./web 为前端构建产物）
 	webRoot := "web"

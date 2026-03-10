@@ -1,5 +1,5 @@
-import React from 'react'
-import { Form, Input, Button, Card, Typography, message, Space } from 'antd'
+import React, { useEffect } from 'react'
+import { Form, Input, Button, Card, Typography, message, Space, Alert } from 'antd'
 import { UserOutlined, LockOutlined, ClusterOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { authApi } from '@/services/api'
@@ -11,6 +11,14 @@ export default function Login() {
   const navigate = useNavigate()
   const setAuth = useAuthStore((s) => s.setAuth)
   const [loading, setLoading] = React.useState(false)
+  const [expiredHint, setExpiredHint] = React.useState(false)
+  useEffect(() => {
+    if (sessionStorage.getItem('kubemanage_login_expired')) {
+      sessionStorage.removeItem('kubemanage_login_expired')
+      setExpiredHint(true)
+      message.warning('登录已过期，请重新登录')
+    }
+  }, [])
 
   const onFinish = async (values: { username: string; password: string }) => {
     setLoading(true)
@@ -39,6 +47,7 @@ export default function Login() {
             <Text type="secondary">企业级 Kubernetes 可视化管理平台</Text>
           </div>
 
+          {expiredHint && <Alert type="warning" message="登录已过期，请重新登录" showIcon style={{ marginBottom: 16 }} />}
           <Form onFinish={onFinish} size="large" style={{ textAlign: 'left' }}>
             <Form.Item name="username" rules={[{ required: true, message: '请输入用户名' }]}>
               <Input prefix={<UserOutlined />} placeholder="用户名" autoFocus />

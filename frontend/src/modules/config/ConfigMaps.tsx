@@ -2,16 +2,22 @@ import React, { useState } from 'react'
 import { Card, Table, Tag, Button, Space, Typography, Select, Modal, Form, Input, message, Popconfirm, Drawer, Descriptions } from 'antd'
 import { FileTextOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, EyeOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { configApi } from '@/services/api'
+import { configApi, namespaceApi } from '@/services/api'
+import { useAuthStore } from '@/stores/auth'
 
 const { Title } = Typography
 
 export default function ConfigMaps() {
+  const currentCluster = useAuthStore((s) => s.currentCluster)
   const [namespace, setNamespace] = useState('default')
   const [createModal, setCreateModal] = useState(false)
   const [selected, setSelected] = useState<any>(null)
   const [form] = Form.useForm()
   const queryClient = useQueryClient()
+
+  const { data: nsData } = useQuery({ queryKey: ['namespaces', currentCluster], queryFn: () => namespaceApi.list(), enabled: !!currentCluster })
+  const nsList = (nsData as any)?.data?.list ?? []
+  const nsOptions = nsList.map((n: any) => ({ value: n.name, label: n.name }))
 
   const { data, isLoading, refetch } = useQuery({ queryKey: ['configmaps', namespace], queryFn: () => configApi.listConfigMaps({ namespace }) })
   const { data: detailData } = useQuery({ queryKey: ['configmap-detail', selected?.name, selected?.namespace], queryFn: () => configApi.getConfigMap(selected?.name, selected?.namespace), enabled: !!selected })
@@ -19,9 +25,13 @@ export default function ConfigMaps() {
   const createMut = useMutation({
     mutationFn: configApi.createConfigMap,
     onSuccess: () => { message.success('创建成功'); setCreateModal(false); form.resetFields(); refetch() },
-    onError: (e: any) => message.error(e.message),
+    onError: (e: any) => message.error(e?.message || '创建失败'),
   })
-  const deleteMut = useMutation({ mutationFn: ({ name, ns }: any) => configApi.deleteConfigMap(name, ns), onSuccess: () => { message.success('已删除'); refetch() } })
+  const deleteMut = useMutation({
+    mutationFn: ({ name, ns }: any) => configApi.deleteConfigMap(name, ns),
+    onSuccess: () => { message.success('已删除'); refetch() },
+    onError: (e: any) => message.error(e?.message || '删除失败'),
+  })
 
   const columns = [
     { title: '名称', dataIndex: 'name', key: 'name', render: (v: string) => <Space><FileTextOutlined style={{ color: '#1677ff' }} /><strong>{v}</strong></Space> },
@@ -44,7 +54,7 @@ export default function ConfigMaps() {
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <Title level={4} style={{ margin: 0 }}>ConfigMaps</Title>
         <Space>
-          <Select value={namespace} style={{ width: 200 }} onChange={setNamespace} options={[{ value: 'default', label: 'default' }, { value: 'kube-system', label: 'kube-system' }]} />
+          <Select value={namespace} style={{ width: 200 }} onChange={setNamespace} options={nsOptions.length ? nsOptions : [{ value: 'default', label: 'default' }]} />
           <Button icon={<ReloadOutlined />} onClick={() => refetch()}>刷新</Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateModal(true)}>创建</Button>
         </Space>

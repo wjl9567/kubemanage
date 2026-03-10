@@ -2,14 +2,24 @@ import React, { useState } from 'react'
 import { Card, Table, Tag, Button, Space, Typography, Select, InputNumber, Modal, Popconfirm, message } from 'antd'
 import { AppstoreOutlined, ReloadOutlined, ScissorOutlined, RedoOutlined, DeleteOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { workloadApi } from '@/services/api'
+import { workloadApi, namespaceApi } from '@/services/api'
+import { useAuthStore } from '@/stores/auth'
 
 const { Title } = Typography
 
 export default function Deployments() {
+  const currentCluster = useAuthStore((s) => s.currentCluster)
   const [namespace, setNamespace] = useState<string>('')
   const [scaleModal, setScaleModal] = useState<{ name: string; ns: string; replicas: number } | null>(null)
   const queryClient = useQueryClient()
+
+  const { data: nsData } = useQuery({
+    queryKey: ['namespaces', currentCluster],
+    queryFn: () => namespaceApi.list(),
+    enabled: !!currentCluster,
+  })
+  const nsList = (nsData as any)?.data?.list ?? []
+  const nsOptions = [{ value: '', label: '全部' }, ...nsList.map((n: any) => ({ value: n.name, label: n.name }))]
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['deployments', namespace],
@@ -19,17 +29,17 @@ export default function Deployments() {
   const scaleMut = useMutation({
     mutationFn: ({ name, ns, replicas }: any) => workloadApi.scaleDeployment(name, ns, replicas),
     onSuccess: () => { message.success('扩缩容成功'); setScaleModal(null); refetch() },
-    onError: (e: any) => message.error(e.message),
+    onError: (e: any) => message.error(e?.message || '操作失败'),
   })
-
   const restartMut = useMutation({
     mutationFn: ({ name, ns }: any) => workloadApi.restartDeployment(name, ns),
     onSuccess: () => { message.success('重启成功'); refetch() },
+    onError: (e: any) => message.error(e?.message || '操作失败'),
   })
-
   const deleteMut = useMutation({
     mutationFn: ({ name, ns }: any) => workloadApi.deleteDeployment(name, ns),
     onSuccess: () => { message.success('已删除'); refetch() },
+    onError: (e: any) => message.error(e?.message || '删除失败'),
   })
 
   const columns = [
@@ -74,8 +84,8 @@ export default function Deployments() {
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <Title level={4} style={{ margin: 0 }}>Deployments</Title>
         <Space>
-          <Select placeholder="命名空间" allowClear style={{ width: 200 }} onChange={setNamespace}
-            options={[{ value: '', label: '全部' }, { value: 'default', label: 'default' }, { value: 'kube-system', label: 'kube-system' }]} />
+          <Select placeholder="命名空间" allowClear style={{ width: 200 }} value={namespace || undefined} onChange={setNamespace}
+            options={nsOptions} />
           <Button icon={<ReloadOutlined />} onClick={() => refetch()}>刷新</Button>
         </Space>
       </div>

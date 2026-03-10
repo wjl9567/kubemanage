@@ -2,16 +2,22 @@ import React, { useState } from 'react'
 import { Card, Table, Tag, Button, Space, Typography, Select, Drawer, Descriptions, Tabs, Popconfirm, message } from 'antd'
 import { ContainerOutlined, ReloadOutlined, DeleteOutlined, CodeOutlined, FileTextOutlined } from '@ant-design/icons'
 import { useQuery, useMutation } from '@tanstack/react-query'
-import { workloadApi } from '@/services/api'
+import { workloadApi, namespaceApi } from '@/services/api'
+import { useAuthStore } from '@/stores/auth'
 import LogViewer from '@/components/LogViewer'
 import PodTerminal from '@/components/Terminal'
 
 const { Title, Text } = Typography
 
 export default function Pods() {
+  const currentCluster = useAuthStore((s) => s.currentCluster)
   const [namespace, setNamespace] = useState('')
   const [selected, setSelected] = useState<any>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
+
+  const { data: nsData } = useQuery({ queryKey: ['namespaces', currentCluster], queryFn: () => namespaceApi.list(), enabled: !!currentCluster })
+  const nsList = (nsData as any)?.data?.list ?? []
+  const nsOptions = [{ value: '', label: '全部' }, ...nsList.map((n: any) => ({ value: n.name, label: n.name }))]
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['pods', namespace],
@@ -70,8 +76,8 @@ export default function Pods() {
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <Title level={4} style={{ margin: 0 }}>Pods ({pods.length})</Title>
         <Space>
-          <Select placeholder="命名空间" allowClear style={{ width: 200 }} onChange={setNamespace}
-            options={[{ value: '', label: '全部' }, { value: 'default', label: 'default' }, { value: 'kube-system', label: 'kube-system' }]} />
+          <Select placeholder="命名空间" allowClear style={{ width: 200 }} value={namespace || undefined} onChange={setNamespace}
+            options={nsOptions} />
           <Button icon={<ReloadOutlined />} onClick={() => refetch()}>刷新</Button>
         </Space>
       </div>
